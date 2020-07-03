@@ -1,0 +1,11 @@
+starlette
+marshmallow
+marshmallow-jsonapi
+
+# testing dependencies
+tox
+pytest
+pytest-asyncio
+pytest-cov
+httpx
+requests
