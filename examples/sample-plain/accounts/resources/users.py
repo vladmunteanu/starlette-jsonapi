@@ -29,7 +29,6 @@ class UserSchema(JSONAPISchema):
 
     class Meta:
         type_ = 'users'
-        strict = True
         self_route = 'users:get'
         self_route_kwargs = {'id': '<id>'}
         self_route_many = 'users:get_all'
