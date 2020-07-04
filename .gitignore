@@ -9,3 +9,5 @@ venv/
 .cache/
 .coverage/
 .coverage
+build/
+dist/
