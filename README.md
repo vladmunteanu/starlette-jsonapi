@@ -11,7 +11,7 @@ any available async ORM. This also means that you are going to get a very basic 
 with some helpers to make your experience more pleasant, but nothing fancy.
 
 ### Features
-- 99% tests coverage
+- 100% tests coverage
 - basic json:api serialization
 - including related resources
 - starlette friendly route generation
@@ -134,6 +134,55 @@ class ExampleResource(BaseResource):
         return await self.serialize(example)
 ```
 
+#### Registering resource paths
+To register a defined resource class, we need to add the appropriate paths to the Starlette app.
+Considering the ExampleResource implementation above, it's as simple as:
+```python
+from starlette.applications import Starlette
+
+app = Starlette()
+ExampleResource.register_routes(app=app, base_path='/api/')
+```
+
+This will add the following routes to the Starlette application:
+- GET `/api/examples/`
+- POST `/api/examples/`
+- GET `/api/examples/{id:str}`
+- PATCH `/api/examples/{id:str}`
+- DELETE `/api/examples/{id:str}`
+
+You can also customize the registered Mount name by specifying `register_as` on the resource class.
+```python
+from starlette.applications import Starlette
+from starlette_jsonapi.resource import BaseResource
+
+class ExampleResourceV2(BaseResource):
+    type_ = 'examples'
+    register_as = 'v2-examples'
+
+app = Starlette()
+ExampleResourceV2.register_routes(app=app, base_path='/api/v2')
+
+assert app.url_path_for('v2-examples:get_all') == '/api/v2/examples/'
+assert app.url_path_for('v2-examples:post') == '/api/v2/examples/'
+assert app.url_path_for('v2-examples:get', id='foo') == '/api/v2/examples/foo'
+assert app.url_path_for('v2-examples:patch', id='foo') == '/api/v2/examples/foo'
+assert app.url_path_for('v2-examples:delete', id='foo') == '/api/v2/examples/foo'
+```
+Which will cause the routes to be registered:
+- GET `/api/v2/examples/`
+- POST `/api/v2/examples/`
+- GET `/api/v2/examples/{id:str}`
+- PATCH `/api/v2/examples/{id:str}`
+- DELETE `/api/v2/examples/{id:str}`
+
+
+#### Accessing the request
+While handling a request inside a resource, you can use `self.request` to access the Starlette Request object.
+
+#### Accessing the request body
+Although directly accessible from `self.request`, you should probably use `self.deserialize_body`
+to raise any validation errors as 400 HTTP responses, while benefiting from a cleaner payload.
 
 ## Contributing
 This project is in its early days, so **any** help is appreciated.
