@@ -1,6 +1,6 @@
 import codecs
 import re
-from setuptools import find_packages, setup
+from setuptools import setup
 
 version_regex = r'__version__ = ["\']([^"\']*)["\']'
 with open('starlette_jsonapi/__init__.py', 'r') as f:
@@ -18,9 +18,10 @@ setup(
     author='Vlad Stefan Munteanu',
     author_email='vladstefanmunteanu@gmail.com',
     long_description=readme,
-    long_description_content_type="text/markdown",
-    packages=find_packages(),
-    package_data={'': ['LICENSE', 'README.md']},
+    long_description_content_type='text/markdown',
+    packages=['starlette_jsonapi'],
+    package_data={'starlette_jsonapi': ['LICENSE', 'README.md']},
+    package_dir={'starlette_jsonapi': 'starlette_jsonapi'},
     include_package_data=True,
     license='MIT License',
     url='https://github.com/vladmunteanu/starlette-jsonapi',
