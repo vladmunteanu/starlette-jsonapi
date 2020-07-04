@@ -10,6 +10,11 @@ Because of that, `starlette_jsonapi` does not contain a data layer implementatio
 any available async ORM. This also means that you are going to get a very basic interface for writing a REST resource, 
 with some helpers to make your experience more pleasant, but nothing fancy.
 
+##### Installing
+`pip install starlette-jsonapi==0.0.1`
+
+Since this project is under development, please pin your dependencies to avoid problems.
+
 ### Features
 - 100% tests coverage
 - basic json:api serialization
