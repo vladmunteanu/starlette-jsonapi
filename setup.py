@@ -18,6 +18,7 @@ setup(
     author='Vlad Stefan Munteanu',
     author_email='vladstefanmunteanu@gmail.com',
     long_description=readme,
+    long_description_content_type="text/markdown",
     packages=find_packages(),
     package_data={'': ['LICENSE', 'README.md']},
     include_package_data=True,
