@@ -1,0 +1,6 @@
+uvicorn
+starlette
+marshmallow
+marshmallow_jsonapi
+
+../../
