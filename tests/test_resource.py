@@ -297,7 +297,23 @@ def included_app(app: Starlette):
                 many=True
             )
 
+    class TResourceNotIncluded(BaseResource):
+        type_ = 'test-resource-not-included'
+        schema = TSchema
+
+        async def get(self, id=None, *args, **kwargs) -> Response:
+            return await self.serialize(
+                dict(id='foo', name='foo-name', rel=dict(id='bar', description='bar-description'))
+            )
+
+        async def get_all(self, *args, **kwargs) -> Response:
+            return await self.serialize(
+                [dict(id='foo2', name='foo2-name', rel=dict(id='bar2', description='bar2-description'))],
+                many=True
+            )
+
     TResource.register_routes(app, '/')
+    TResourceNotIncluded.register_routes(app, '/')
     return app
 
 
@@ -386,4 +402,49 @@ def test_included_data_many(included_app: Starlette):
                 }
             }
         ]
+    }
+
+
+def test_no_included_data(included_app: Starlette):
+    # if resource does not override `prepare_relations`,
+    # compound documents will not be generated
+    test_client = TestClient(app=included_app)
+    rv = test_client.get('/test-resource-not-included/foo?include=rel')
+    assert rv.status_code == 200
+    assert rv.json() == {
+        'data': {
+            'id': 'foo',
+            'type': 'test-resource',
+            'attributes': {
+                'name': 'foo-name',
+            },
+            'relationships': {
+                'rel': {
+                    'data': {
+                        'type': 'test-related-resource',
+                        'id': 'bar',
+                    }
+                }
+            }
+        }
+    }
+
+    rv = test_client.get('/test-resource-not-included/?include=rel')
+    assert rv.status_code == 200
+    assert rv.json() == {
+        'data': [{
+            'id': 'foo2',
+            'type': 'test-resource',
+            'attributes': {
+                'name': 'foo2-name',
+            },
+            'relationships': {
+                'rel': {
+                    'data': {
+                        'type': 'test-related-resource',
+                        'id': 'bar2',
+                    }
+                }
+            }
+        }]
     }

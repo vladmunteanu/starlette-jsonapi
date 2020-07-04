@@ -15,10 +15,45 @@ logger = logging.getLogger(__name__)
 
 
 class BaseResource:
+    """ A basic json:api resource implementation, data layer agnostic. """
+
+    # The json:api type, used to compute the path for this resource
+    # such that BaseResource.register_routes(app=app, base_path='/api/') will register
+    # the following routes:
+    # - GET `/api/<type_>/`
+    # - POST `/api/<type_>/`
+    # - GET `/api/<type_>/{id:str}`
+    # - PATCH `/api/<type_>/{id:str}`
+    # - DELETE `/api/<type_>/{id:str}`
     type_: str = ''
+
+    # The json:api serializer, a subclass of JSONAPISchema.
     schema: Type[JSONAPISchema] = JSONAPISchema
+
+    # High level filter for HTTP requests.
+    # If you specify a smaller subset, any request that specifies a method
+    # not listed here will result in a 405 error.
     allowed_methods = {'GET', 'PATCH', 'POST', 'DELETE'}
+
+    # By default `str`, but other options are documented in Starlette:
+    # 'str', 'int', 'float', 'uuid', 'path'
     id_mask: str = 'str'
+
+    # Optional, by default this will equal `type_` and will be used to register the Mount name.
+    # Impacts the result of `url_path_for`, so it can be used to support multiple resource versions.
+    # For example:
+    # ```
+    # from starlette.applications import Starlette
+    #
+    # class SomeResource(BaseResource):
+    #   type_ = 'examples'
+    #   register_as = 'v2-examples'
+    #
+    # app = Starlette()
+    # SomeResource.register_routes(app=app, base_path='/api/v2')
+    # assert app.url_path_for('v2-examples:get_all') == '/api/v2/examples/'
+    # ```
+    # `url_path_for` will
     register_as: str = ''
 
     def __init__(self, request: Request, *args, **kwargs) -> None:
@@ -96,10 +131,9 @@ class BaseResource:
             id_ = request.path_params.get('id')
             kwargs.update({'id': id_})
 
-        if request.method not in cls.allowed_methods:
-            raise JSONAPIException(status_code=405)
-
         try:
+            if request.method not in cls.allowed_methods:
+                raise JSONAPIException(status_code=405)
             resource = cls(request)
             handler = getattr(resource, handler_name, None)
             if not handler:
