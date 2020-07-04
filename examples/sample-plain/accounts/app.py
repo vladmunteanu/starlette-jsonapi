@@ -10,7 +10,7 @@ def create_app():
     register_jsonapi_exception_handlers(app)
 
     # register routes
-    from sample_plain.resources import users, organizations
+    from accounts.resources import users, organizations
     users.UsersResource.register_routes(app, '/api')
     organizations.OrganizationsResource.register_routes(app, '/api')
 

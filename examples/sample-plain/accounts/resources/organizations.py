@@ -1,12 +1,12 @@
 from marshmallow_jsonapi import fields
-from starlette.responses import JSONResponse, Response
+from starlette.responses import Response
 
 from starlette_jsonapi.resource import BaseResource
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
 
-from sample_plain.exceptions import OrganizationNotFound
-from sample_plain.models import Organization
+from accounts.exceptions import OrganizationNotFound
+from accounts.models import Organization
 
 
 class OrganizationSchema(JSONAPISchema):

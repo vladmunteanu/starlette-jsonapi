@@ -3,15 +3,15 @@ from typing import List
 
 from marshmallow_jsonapi import fields
 from starlette.exceptions import HTTPException
-from starlette.responses import Response, JSONResponse
+from starlette.responses import Response
 
 from starlette_jsonapi.fields import JSONAPIRelationship
 from starlette_jsonapi.resource import BaseResource
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
 
-from sample_plain.exceptions import UserNotFound, OrganizationNotFound
-from sample_plain.models import User, Organization
+from accounts.exceptions import UserNotFound, OrganizationNotFound
+from accounts.models import User, Organization
 
 logger = logging.getLogger(__name__)
 

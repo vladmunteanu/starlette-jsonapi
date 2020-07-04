@@ -1,6 +1,8 @@
 uvicorn
 starlette
+tortoise-orm
+asyncpg
 marshmallow
-marshmallow_jsonapi
+marshmallow-jsonapi
 
 git+ssh://git@github.com/vladmunteanu/starlette-jsonapi
