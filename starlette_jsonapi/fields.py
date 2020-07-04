@@ -1,4 +1,5 @@
 from marshmallow_jsonapi.fields import Relationship as __BaseRelationship
+from marshmallow_jsonapi.utils import resolve_params
 from starlette.applications import Starlette
 
 
@@ -37,8 +38,9 @@ class JSONAPIRelationship(__BaseRelationship):
         return self._serialize(None, attr, obj)
 
     def get_url(self, obj, route_name, **kwargs):
-        if self.schema and self.schema.app and isinstance(self.schema.app, Starlette) and route_name:
-            return self.schema.app.url_path_for(route_name, **kwargs)
+        if route_name and self.parent and self.parent.app and isinstance(self.parent.app, Starlette):
+            kwargs = resolve_params(obj, kwargs, default=self.default)
+            return self.parent.app.url_path_for(route_name, **kwargs)
         return None
 
     def get_related_url(self, obj):

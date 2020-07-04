@@ -136,9 +136,6 @@ class BaseResource:
                 raise JSONAPIException(status_code=405)
             resource = cls(request)
             handler = getattr(resource, handler_name, None)
-            if not handler:
-                raise JSONAPIException(status_code=405)
-
             response = await handler(*args, **kwargs)  # type: Response
         except Exception as e:
             response = await cls.handle_error(request=request, exc=e)

@@ -1,3 +1,4 @@
+import logging
 from typing import Any, List
 
 import pytest
@@ -253,6 +254,20 @@ def test_deserialize_raises_validation_errors(serialization_app: Starlette):
         ]
     }
 
+    rv = test_client.post(
+        '/test-resource/',
+        headers={'Content-Type': 'application/vnd.api+json'},
+    )
+    assert rv.status_code == 400
+    assert rv.headers['Content-Type'] == 'application/vnd.api+json'
+    assert rv.json() == {
+        'errors': [
+            {
+                'detail': 'Could not read request body.',
+            }
+        ]
+    }
+
 
 @pytest.fixture()
 def included_app(app: Starlette):
@@ -448,3 +463,61 @@ def test_no_included_data(included_app: Starlette):
             }
         }]
     }
+
+
+def test_handle_error_logs_unhandled_exceptions(app: Starlette, caplog):
+    # this should be useful, we don't want to return 500 exceptions without knowing what the error was.
+    exc = Exception('TestException was raised')
+
+    class TResource(BaseResource):
+        type_ = 'test-resource'
+
+        async def get(self, id=None, *args, **kwargs) -> Response:
+            raise exc
+
+    TResource.register_routes(app, '/')
+
+    test_client = TestClient(app)
+    rv = test_client.get('/test-resource/foo')
+    assert rv.status_code == 500
+    assert rv.json() == {
+        'errors': [{'detail': 'Internal server error'}]
+    }
+    exception_log_message = (
+        'starlette_jsonapi.resource', logging.ERROR, 'Encountered an error while handling request.'
+    )
+    assert exception_log_message in caplog.record_tuples
+    assert any(log.exc_info[1] == exc and log.name == 'starlette_jsonapi.resource' for log in caplog.records)
+
+
+def test_method_not_allowed(app: Starlette):
+    class TResource(BaseResource):
+        type_ = 'test-resource'
+        allowed_methods = {'GET'}
+
+        async def get_all(self, *args, **kwargs) -> Response:
+            return Response(status_code=200)
+
+        async def post(self, *args, **kwargs) -> Response:
+            return Response(status_code=200)
+
+    TResource.register_routes(app, '/')
+
+    test_client = TestClient(app)
+    rv = test_client.get('/test-resource/')
+    assert rv.status_code == 200
+
+    rv = test_client.post('/test-resource/')
+    assert rv.status_code == 405
+    assert rv.json() == {
+        'errors': [{'detail': 'Method Not Allowed'}]
+    }
+
+
+def test_register_without_type_(app: Starlette):
+    class TResource(BaseResource):
+        pass
+
+    with pytest.raises(Exception) as exc:
+        TResource.register_routes(app, '/')
+    assert str(exc.value) == 'Cannot register a resource without specifying its `type_`.'
