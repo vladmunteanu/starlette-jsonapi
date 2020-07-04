@@ -33,7 +33,8 @@ In order to start the service on http://127.0.0.1:8000/, you can run:
 
 
 ## 2. sample-tortoise-orm
-    
+Requires Python > 3.7 to avoid SQL injection bugs in tortoise-orm.
+
 Contains a basic implementation of 2 resources, `users` and `organizations` using tortoise-orm with a PostgreSQL database.
 
 #### Running:
