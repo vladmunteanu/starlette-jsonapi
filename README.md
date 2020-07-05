@@ -11,7 +11,7 @@ any available async ORM. This also means that you are going to get a very basic 
 with some helpers to make your experience more pleasant, but nothing fancy.
 
 ##### Installing
-`pip install starlette-jsonapi==0.0.1`
+`pip install starlette-jsonapi==0.1.0`
 
 Since this project is under development, please pin your dependencies to avoid problems.
 
@@ -220,7 +220,7 @@ class EmployeeManagerResource(BaseRelationshipResource):
 
 app = Starlette()
 EmployeeResource.register_routes(app=app, base_path='/')
-EmployeeManagerResource.register_routes(app=app, base_path='/')
+EmployeeManagerResource.register_routes(app=app)
 ```
 
 #### Registering resource paths
