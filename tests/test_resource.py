@@ -893,7 +893,7 @@ def test_relationship_resource_incorrect_field(app: Starlette):
             try:
                 self._get_relationship_field()
             except AttributeError as exc:
-                if str(exc) == f'Parent schema does not define relationship {self.relationship_name}.':
+                if str(exc) == f'Parent schema does not define `{self.relationship_name}` relationship.':
                     return Response(status_code=200)
             return Response(status_code=500)
 

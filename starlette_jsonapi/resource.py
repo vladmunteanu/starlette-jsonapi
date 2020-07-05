@@ -106,6 +106,7 @@ class BaseResource:
         return body
 
     async def serialize(self, data: Any, many=False) -> JSONAPIResponse:
+        """ Serializes data as a JSON:API payload and returns a JSONAPIResponse which can be served to clients. """
         included_relations = await self._prepare_included(data=data, many=many)
         schema = self.schema(app=self.request.app, include_data=included_relations)
         body = schema.dump(data, many=many)
@@ -125,9 +126,9 @@ class BaseResource:
             extract_id: bool = False, *args, **kwargs
     ) -> Response:
         """
-            Handles a request by calling the appropriate handler.
-            Additional args and kwargs are passed to the handler method,
-            which is usually one of: `get`, `patch`, `delete`, `get_all` or `post`.
+        Handles a request by calling the appropriate handler.
+        Additional args and kwargs are passed to the handler method,
+        which is usually one of: `get`, `patch`, `delete`, `get_all` or `post`.
         """
         if extract_id:
             id_ = request.path_params.get('id')
@@ -237,8 +238,14 @@ class _StopInclude(Exception):
 
 
 class BaseRelationshipResource:
+    """ A basic json:api relationships resource implementation, data layer agnostic. """
+    # The parent resource that this relationship belongs to
     parent_resource: Type[BaseResource]
+    # The relationship name, as found on the parent resource schema
     relationship_name: str
+    # High level filter for HTTP requests.
+    # If you specify a smaller subset, any request that specifies a method
+    # not listed here will result in a 405 error.
     allowed_methods = {'GET', 'PATCH', 'POST', 'DELETE'}
 
     def __init__(self, request: Request, *args, **kwargs) -> None:
@@ -257,14 +264,18 @@ class BaseRelationshipResource:
         raise JSONAPIException(status_code=405)
 
     def _get_relationship_field(self) -> JSONAPIRelationship:
+        """ Returns the relationship field defined on the parent resource schema. """
         schema = self.parent_resource.schema(app=self.request.app)
         declared_fields = schema.declared_fields
         relationship = declared_fields.get(self.relationship_name)
         if not relationship or not isinstance(relationship, JSONAPIRelationship):
-            raise AttributeError(f'Parent schema does not define relationship {self.relationship_name}.')
+            raise AttributeError(f'Parent schema does not define `{self.relationship_name}` relationship.')
         return relationship
 
     async def serialize(self, data: Any, many=False) -> JSONAPIResponse:
+        """
+        Serializes relationship for an object represented by the parent resource.
+        """
         relationship = self._get_relationship_field()
         body = relationship.serialize(self.relationship_name, data)
         return JSONAPIResponse(
@@ -272,6 +283,11 @@ class BaseRelationshipResource:
         )
 
     async def deserialize_ids(self) -> Union[None, str, List[str]]:
+        """
+        Parses the request body to find relationship ids.
+        Raises JSONAPIException with a 400 status code if the payload does not pass
+        json:api validation.
+        """
         content_type = self.request.headers.get('content-type')
         if self.request.method in ('POST', 'PATCH') and content_type != 'application/vnd.api+json':
             raise JSONAPIException(
@@ -306,9 +322,9 @@ class BaseRelationshipResource:
     @classmethod
     async def handle_request(cls, request: Request, *args, **kwargs) -> Response:
         """
-            Handles a request by calling the appropriate handler based on the request method.
-            Additional args and kwargs are passed to the handler method,
-            which is usually one of: `get`, `patch`, `delete`, or `post`.
+        Handles a request by calling the appropriate handler based on the request method.
+        Additional args and kwargs are passed to the handler method,
+        which is usually one of: `get`, `patch`, `delete`, or `post`.
         """
         try:
             if request.method not in cls.allowed_methods:
