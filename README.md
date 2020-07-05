@@ -30,10 +30,11 @@ Since this project is under development, please pin your dependencies to avoid p
 - documentation
 - examples for other ORMs
 
-## Docs
-You should take a look at the [examples](examples) directory for implementation ideas.
+## Documentation
+You should take a look at the [examples](examples) directory for implementations.
 
-After you've decided which ORM to use, you can start writing the associated schemas, 
+### Defining a schema
+After you've decided which ORM to use, you can start writing the associated schemas
 using the marshmallow_jsonapi library (which itself is extending [marshmallow](https://marshmallow.readthedocs.io/)).  
 
 ```python
@@ -71,6 +72,7 @@ You can also generate the associated `links` object by specifying more options i
 ```python
 from marshmallow_jsonapi import fields
 from starlette_jsonapi.schema import JSONAPISchema
+
 class SomeSchema(JSONAPISchema):
     id = fields.Str(dump_only=True)
     name = fields.Str()
@@ -82,8 +84,28 @@ class SomeSchema(JSONAPISchema):
         self_route_many = 'some-resource:get_all'
 ```
 
+### Defining a resource
 
-Once the schema is defined, we can move to adding the associated resource class
+Once the schema is defined, we can add the associated resource class and link them by setting the `schema` attribute
+on the resource class.
+
+Resources are implemented by subclassing `starlette_jsonapi.resource.BaseResource`.
+A json:api compliant service will implement GET, POST, PATCH, DELETE HTTP methods on a resource,
+so the `BaseResource` comes with 5 methods that you can override:
+- `get -> handling GET /<id>`
+- `patch -> handling PATCH /<id>`
+- `delete -> handling DELETE /<id>`
+- `get_all -> handling GET /`
+- `post -> handling POST /`
+
+All methods return 405 Method Not Allowed by default.
+You can also customize `allowed_methods` to a subset of the above HTTP methods.
+
+Additionally, the `prepare_relations` method is available for enabling inclusion of related resources.
+Since the json:api specification does not enforce this, the default implementation will skip inclusion
+in order to avoid data leaks.
+
+Example:
 ```python
 from starlette_jsonapi.resource import BaseResource
 from starlette_jsonapi.responses import JSONAPIResponse
@@ -135,6 +157,7 @@ class ExampleResource(BaseResource):
         
         # We didn't ask for a partial deserialization, so a required field shouldn't throw a KeyError
         example['some_required_field'] = body['some_required_field']
+        examples_db[example['id']] = example
 
         return await self.serialize(example)
 ```
