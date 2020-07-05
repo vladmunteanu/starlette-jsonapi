@@ -8,7 +8,7 @@ from starlette.responses import Response
 from starlette.testclient import TestClient
 
 from starlette_jsonapi.fields import JSONAPIRelationship
-from starlette_jsonapi.resource import BaseResource
+from starlette_jsonapi.resource import BaseResource, BaseRelationshipResource
 from starlette_jsonapi.schema import JSONAPISchema
 
 
@@ -521,3 +521,286 @@ def test_register_without_type_(app: Starlette):
     with pytest.raises(Exception) as exc:
         TResource.register_routes(app, '/')
     assert str(exc.value) == 'Cannot register a resource without specifying its `type_`.'
+
+
+@pytest.fixture()
+def relationship_app(app: Starlette):
+    class TSchema(JSONAPISchema):
+        id = fields.Str(dump_only=True)
+        name = fields.Str()
+
+        rel = JSONAPIRelationship(
+            schema='TRelatedSchema',
+            type_='test-related-resource',
+            include_resource_linkage=True,
+        )
+
+        class Meta:
+            type_ = 'test-resource'
+
+    class TRelatedSchema(JSONAPISchema):
+        id = fields.Str(dump_only=True)
+        description = fields.Str()
+
+        class Meta:
+            type_ = 'test-related-resource'
+
+    class TResource(BaseResource):
+        type_ = 'test-resource'
+        schema = TSchema
+
+    class TResourceRel(BaseRelationshipResource):
+        parent_resource = TResource
+        relationship_name = 'rel'
+
+        async def get(self, parent_id: str, *args, **kwargs) -> Response:
+            return await self.serialize(
+                dict(
+                    id='foo', name='foo-name',
+                    rel=dict(id='bar', description='bar-description'),
+                )
+            )
+
+        async def post(self, parent_id: str, *args, **kwargs) -> Response:
+            relationship_id = await self.deserialize_ids()
+            return await self.serialize(
+                dict(
+                    id=parent_id, name='foo-name',
+                    rel=dict(id=relationship_id, description='bar-description'),
+                )
+            )
+
+    TResource.register_routes(app, '/')
+    TResourceRel.register_routes(app)
+
+    return app
+
+
+def test_relationship_resource(relationship_app: Starlette):
+    test_client = TestClient(app=relationship_app)
+    rv = test_client.get('/test-resource/foo/relationships/rel')
+    assert rv.status_code == 200
+    assert rv.headers['Content-Type'] == 'application/vnd.api+json'
+    assert rv.json() == {
+        'data': {
+            'type': 'test-related-resource',
+            'id': 'bar'
+        }
+    }
+
+    rv = test_client.post(
+        '/test-resource/foo/relationships/rel',
+        headers={'Content-Type': 'application/vnd.api+json'},
+        json={
+            'data': {
+                'type': 'test-related-resource',
+                'id': 'rel2',
+            }
+        }
+    )
+    assert rv.status_code == 200
+    assert rv.headers['Content-Type'] == 'application/vnd.api+json'
+    assert rv.json() == {
+        'data': {
+            'type': 'test-related-resource',
+            'id': 'rel2',
+        }
+    }
+
+    # test missing data
+    rv = test_client.post(
+        '/test-resource/foo/relationships/rel',
+        headers={'Content-Type': 'application/vnd.api+json'},
+        json={
+        }
+    )
+    assert rv.status_code == 400
+    assert rv.headers['Content-Type'] == 'application/vnd.api+json'
+    assert rv.json() == {
+        'errors': [
+            {'detail': 'Must include a `data` key'}
+        ]
+    }
+
+    # test missing id
+    rv = test_client.post(
+        '/test-resource/foo/relationships/rel',
+        headers={'Content-Type': 'application/vnd.api+json'},
+        json={
+            'data': {
+                'type': 'test-related-resource',
+            }
+        }
+    )
+    assert rv.status_code == 400
+    assert rv.headers['Content-Type'] == 'application/vnd.api+json'
+    assert rv.json() == {
+        'errors': [
+            {'detail': 'Must have an `id` field'}
+        ]
+    }
+
+
+@pytest.fixture()
+def relationship_many_app(app: Starlette):
+    class TSchema(JSONAPISchema):
+        id = fields.Str(dump_only=True)
+        name = fields.Str()
+
+        rel_many = JSONAPIRelationship(
+            schema='TRelatedSchema',
+            type_='test-related-resource',
+            include_resource_linkage=True,
+            many=True
+        )
+
+        class Meta:
+            type_ = 'test-resource'
+
+    class TRelatedSchema(JSONAPISchema):
+        id = fields.Str(dump_only=True)
+        description = fields.Str()
+
+        class Meta:
+            type_ = 'test-related-resource'
+
+    class TResource(BaseResource):
+        type_ = 'test-resource'
+        schema = TSchema
+
+    class TResourceRel(BaseRelationshipResource):
+        parent_resource = TResource
+        relationship_name = 'rel_many'
+
+        async def get(self, parent_id: str, *args, **kwargs) -> Response:
+            return await self.serialize(
+                dict(
+                    id='foo',
+                    name='foo-name',
+                    rel_many=[
+                        dict(id='bar1', description='bar1-description'),
+                        dict(id='bar2', description='bar2-description'),
+                    ],
+                )
+            )
+
+        async def post(self, parent_id: str, *args, **kwargs) -> Response:
+            relationship_ids = await self.deserialize_ids()
+            return await self.serialize(
+                dict(
+                    id=parent_id,
+                    name='foo-name',
+                    rel_many=[
+                        dict(id='bar1', description='bar1-description'),
+                        dict(id='bar2', description='bar2-description'),
+                    ] + [
+                        dict(id=relationship_id, description='bar-added-description')
+                        for relationship_id in relationship_ids
+                    ],
+                )
+            )
+
+    TResource.register_routes(app, '/')
+    TResourceRel.register_routes(app)
+
+    return app
+
+
+def test_relationship_many_resource(relationship_many_app: Starlette):
+    test_client = TestClient(app=relationship_many_app)
+    rv = test_client.get('/test-resource/foo/relationships/rel_many')
+    assert rv.status_code == 200
+    assert rv.headers['Content-Type'] == 'application/vnd.api+json'
+    assert rv.json() == {
+        'data': [
+            {
+                'type': 'test-related-resource',
+                'id': 'bar1'
+            },
+            {
+                'type': 'test-related-resource',
+                'id': 'bar2'
+            },
+        ]
+    }
+
+    rv = test_client.post(
+        '/test-resource/foo/relationships/rel_many',
+        headers={'Content-Type': 'application/vnd.api+json'},
+        json={
+            'data': [{
+                'type': 'test-related-resource',
+                'id': 'bar3',
+            }]
+        }
+    )
+    assert rv.status_code == 200
+    assert rv.headers['Content-Type'] == 'application/vnd.api+json'
+    assert rv.json() == {
+        'data': [
+            {
+                'type': 'test-related-resource',
+                'id': 'bar1'
+            },
+            {
+                'type': 'test-related-resource',
+                'id': 'bar2'
+            },
+            {
+                'type': 'test-related-resource',
+                'id': 'bar3'
+            },
+        ]
+    }
+
+    # test missing data
+    rv = test_client.post(
+        '/test-resource/foo/relationships/rel_many',
+        headers={'Content-Type': 'application/vnd.api+json'},
+        json={
+        }
+    )
+    assert rv.status_code == 400
+    assert rv.headers['Content-Type'] == 'application/vnd.api+json'
+    assert rv.json() == {
+        'errors': [
+            {'detail': 'Must include a `data` key'}
+        ]
+    }
+
+    # test missing id
+    rv = test_client.post(
+        '/test-resource/foo/relationships/rel_many',
+        headers={'Content-Type': 'application/vnd.api+json'},
+        json={
+            'data': [
+                {'type': 'test-related-resource'}
+            ]
+        }
+    )
+    assert rv.status_code == 400
+    assert rv.headers['Content-Type'] == 'application/vnd.api+json'
+    assert rv.json() == {
+        'errors': [
+            {'detail': 'Must have an `id` field'}
+        ]
+    }
+
+    # test expected list
+    rv = test_client.post(
+        '/test-resource/foo/relationships/rel_many',
+        headers={'Content-Type': 'application/vnd.api+json'},
+        json={
+            'data': {
+                'type': 'test-related-resource',
+                'id': 'test-expected-list'
+            }
+        }
+    )
+    assert rv.status_code == 400
+    assert rv.headers['Content-Type'] == 'application/vnd.api+json'
+    assert rv.json() == {
+        'errors': [
+            {'detail': 'Relationship is list-like'}
+        ]
+    }

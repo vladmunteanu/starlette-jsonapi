@@ -1,12 +1,14 @@
 import logging
-from typing import Type, Any, List, Optional
+from typing import Type, Any, List, Optional, Union
 
+from marshmallow.exceptions import ValidationError
 from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import Response
 from starlette.routing import Route, Mount
 
 from starlette_jsonapi.exceptions import JSONAPIException, HTTPException
+from starlette_jsonapi.fields import JSONAPIRelationship
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
 from starlette_jsonapi.utils import parse_included_params, serialize_error
@@ -125,7 +127,7 @@ class BaseResource:
         """
             Handles a request by calling the appropriate handler.
             Additional args and kwargs are passed to the handler method,
-            which is usually one of: `get`, `put`, `patch`, `delete`, `get_all` or `post`.
+            which is usually one of: `get`, `patch`, `delete`, `get_all` or `post`.
         """
         if extract_id:
             id_ = request.path_params.get('id')
@@ -232,3 +234,117 @@ class BaseResource:
 
 class _StopInclude(Exception):
     pass
+
+
+class BaseRelationshipResource:
+    parent_resource: Type[BaseResource]
+    relationship_name: str
+    allowed_methods = {'GET', 'PATCH', 'POST', 'DELETE'}
+
+    def __init__(self, request: Request, *args, **kwargs) -> None:
+        self.request = request
+
+    async def post(self, parent_id: str, *args, **kwargs) -> Response:
+        raise JSONAPIException(status_code=405)
+
+    async def get(self, parent_id: str, *args, **kwargs) -> Response:
+        raise JSONAPIException(status_code=405)
+
+    async def patch(self, parent_id: str, *args, **kwargs) -> Response:
+        raise JSONAPIException(status_code=405)
+
+    async def delete(self, parent_id: str, *args, **kwargs) -> Response:
+        raise JSONAPIException(status_code=405)
+
+    def _get_relationship_field(self) -> JSONAPIRelationship:
+        schema = self.parent_resource.schema(app=self.request.app)
+        declared_fields = schema.declared_fields
+        relationship = declared_fields.get(self.relationship_name)
+        if not relationship or not isinstance(relationship, JSONAPIRelationship):
+            raise AttributeError(f'Parent schema does not define relationship {self.relationship_name}.')
+        return relationship
+
+    async def serialize(self, data: Any, many=False) -> JSONAPIResponse:
+        relationship = self._get_relationship_field()
+        body = relationship.serialize(self.relationship_name, data)
+        return JSONAPIResponse(
+            content=body,
+        )
+
+    async def deserialize_ids(self) -> Union[str, List[str]]:
+        content_type = self.request.headers.get('content-type')
+        if self.request.method in ('POST', 'PATCH') and content_type != 'application/vnd.api+json':
+            raise JSONAPIException(
+                status_code=400,
+                detail='Incorrect or missing Content-Type header, expected `application/vnd.api+json`.',
+            )
+        try:
+            body = await self.request.json()
+        except Exception:
+            logger.debug('Could not read request body.', exc_info=True)
+            raise JSONAPIException(status_code=400, detail='Could not read request body.')
+
+        relationship = self._get_relationship_field()
+        try:
+            deserialized_ids = relationship.deserialize(body)
+        except ValidationError as exc:
+            logger.debug('Could not validate request body according to JSON:API spec: %s.', exc.messages)
+            errors = []
+            if isinstance(exc.messages, list) and len(exc.messages) > 0:
+                for message in exc.messages:
+                    errors.append({'detail': message})
+
+            raise JSONAPIException(status_code=400, errors=errors)
+        return deserialized_ids
+
+    @classmethod
+    async def handle_error(cls, request: Request, exc: Exception) -> JSONAPIResponse:
+        if not isinstance(exc, HTTPException):
+            logger.exception('Encountered an error while handling request.')
+        return serialize_error(exc)
+
+    @classmethod
+    async def handle_request(cls, request: Request, *args, **kwargs) -> Response:
+        """
+            Handles a request by calling the appropriate handler based on the request method.
+            Additional args and kwargs are passed to the handler method,
+            which is usually one of: `get`, `patch`, `delete`, or `post`.
+        """
+        try:
+            if request.method not in cls.allowed_methods:
+                raise JSONAPIException(status_code=405)
+            kwargs.update(parent_id=request.path_params['parent_id'])
+            resource = cls(request)
+            handler = getattr(resource, request.method.lower(), None)
+            response = await handler(*args, **kwargs)  # type: Response
+        except Exception as e:
+            response = await cls.handle_error(request=request, exc=e)
+        return response
+
+    @classmethod
+    def register_routes(cls, app: Starlette, *args, **kwargs):
+        if not cls.parent_resource.type_:
+            raise Exception(
+                'Cannot register a relationship resource if the `parent_resource` does not specify a `type_`.'
+            )
+
+        parent_name = cls.parent_resource.register_as or cls.parent_resource.type_
+
+        # find the parent mount and append the new Route to it
+        for route in app.routes:
+            if isinstance(route, Mount):
+                if getattr(route, 'name', None) == parent_name:
+                    route.routes.append(
+                        Route(
+                            name=cls.relationship_name,
+                            path='/{{parent_id:{}}}/relationships/{}'.format(
+                                cls.parent_resource.id_mask,
+                                cls.relationship_name
+                            ),
+                            endpoint=cls.handle_request,
+                            methods=['GET', 'POST', 'PATCH', 'DELETE'],
+                        )
+                    )
+                    break
+        else:
+            raise Exception('Parent resource should be registered first.')
