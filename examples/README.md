@@ -24,7 +24,7 @@ You can then access [users](http://127.0.0.1:8000/api/users/) and [organizations
 
 ## 1. sample-plain
 
-Contains a basic implementation of 2 resources, `users` and `organizations` using plain Python classes.
+Contains a basic implementation of 3 resources: `users`, `teams` and `organizations` using plain Python classes.
 
 #### Running:
 In order to start the service on http://127.0.0.1:8000/, you can run:
