@@ -563,10 +563,13 @@ def relationship_app(app: Starlette):
 
         async def post(self, parent_id: str, *args, **kwargs) -> Response:
             relationship_id = await self.deserialize_ids()
+            relationship = dict(id=relationship_id, description='bar-description')
+            if relationship_id is None:
+                relationship = None
             return await self.serialize(
                 dict(
                     id=parent_id, name='foo-name',
-                    rel=dict(id=relationship_id, description='bar-description'),
+                    rel=relationship,
                 )
             )
 
@@ -605,6 +608,20 @@ def test_relationship_resource(relationship_app: Starlette):
             'type': 'test-related-resource',
             'id': 'rel2',
         }
+    }
+
+    # test emptying relationship
+    rv = test_client.post(
+        '/test-resource/foo/relationships/rel',
+        headers={'Content-Type': 'application/vnd.api+json'},
+        json={
+            'data': None
+        }
+    )
+    assert rv.status_code == 200
+    assert rv.headers['Content-Type'] == 'application/vnd.api+json'
+    assert rv.json() == {
+        'data': None
     }
 
     # test missing data
@@ -686,17 +703,24 @@ def relationship_many_app(app: Starlette):
 
         async def post(self, parent_id: str, *args, **kwargs) -> Response:
             relationship_ids = await self.deserialize_ids()
+            relationships = [
+                dict(id='bar1', description='bar1-description'),
+                dict(id='bar2', description='bar2-description'),
+            ]
+
+            if len(relationship_ids) == 0:
+                relationships = []
+            else:
+                relationships += [
+                    dict(id=relationship_id, description='bar-added-description')
+                    for relationship_id in relationship_ids
+                ]
+
             return await self.serialize(
                 dict(
                     id=parent_id,
                     name='foo-name',
-                    rel_many=[
-                        dict(id='bar1', description='bar1-description'),
-                        dict(id='bar2', description='bar2-description'),
-                    ] + [
-                        dict(id=relationship_id, description='bar-added-description')
-                        for relationship_id in relationship_ids
-                    ],
+                    rel_many=relationships,
                 )
             )
 
@@ -751,6 +775,20 @@ def test_relationship_many_resource(relationship_many_app: Starlette):
                 'id': 'bar3'
             },
         ]
+    }
+
+    # test emptying relationship
+    rv = test_client.post(
+        '/test-resource/foo/relationships/rel_many',
+        headers={'Content-Type': 'application/vnd.api+json'},
+        json={
+            'data': []
+        }
+    )
+    assert rv.status_code == 200
+    assert rv.headers['Content-Type'] == 'application/vnd.api+json'
+    assert rv.json() == {
+        'data': []
     }
 
     # test missing data
