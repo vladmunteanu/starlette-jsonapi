@@ -563,9 +563,10 @@ def relationship_app(app: Starlette):
 
         async def post(self, parent_id: str, *args, **kwargs) -> Response:
             relationship_id = await self.deserialize_ids()
-            relationship = dict(id=relationship_id, description='bar-description')
             if relationship_id is None:
                 relationship = None
+            else:
+                relationship = dict(id=relationship_id, description='bar-description')
             return await self.serialize(
                 dict(
                     id=parent_id, name='foo-name',
@@ -708,13 +709,13 @@ def relationship_many_app(app: Starlette):
                 dict(id='bar2', description='bar2-description'),
             ]
 
-            if len(relationship_ids) == 0:
-                relationships = []
-            else:
+            if relationship_ids:
                 relationships += [
                     dict(id=relationship_id, description='bar-added-description')
                     for relationship_id in relationship_ids
                 ]
+            else:
+                relationships = []
 
             return await self.serialize(
                 dict(

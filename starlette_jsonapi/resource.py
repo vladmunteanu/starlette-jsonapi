@@ -271,7 +271,7 @@ class BaseRelationshipResource:
             content=body,
         )
 
-    async def deserialize_ids(self) -> Union[str, List[str]]:
+    async def deserialize_ids(self) -> Union[None, str, List[str]]:
         content_type = self.request.headers.get('content-type')
         if self.request.method in ('POST', 'PATCH') and content_type != 'application/vnd.api+json':
             raise JSONAPIException(
