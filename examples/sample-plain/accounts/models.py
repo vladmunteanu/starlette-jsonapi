@@ -34,7 +34,7 @@ class Model:
 
 
 class Organization(Model):
-    __db_name__: str = 'organizations'
+    __db_name__ = 'organizations'
 
     name: str
     contact_url: Optional[str] = None
@@ -42,7 +42,14 @@ class Organization(Model):
 
 
 class User(Model):
-    __db_name__: str = 'users'
+    __db_name__ = 'users'
 
     username: str
     organization: Organization
+
+
+class Team(Model):
+    __db_name__ = 'teams'
+
+    name: str
+    users: List[User]

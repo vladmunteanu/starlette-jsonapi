@@ -20,13 +20,13 @@ Since this project is under development, please pin your dependencies to avoid p
 - basic json:api serialization
 - including related resources
 - starlette friendly route generation
-- exception handlers to serialize as json:api responses 
+- exception handlers to serialize as json:api responses
+- relationship resources 
 
 ### Todo:
 - sparse fields
 - pagination helpers
 - sorting helpers
-- relationship resources
 - documentation
 - examples for other ORMs
 
@@ -160,6 +160,67 @@ class ExampleResource(BaseResource):
         examples_db[example['id']] = example
 
         return await self.serialize(example)
+```
+
+### Defining a relationship resource
+You can choose to define a relationship resource by subclassing `starlette_jsonapi.resource.BaseRelationshipResource`.
+
+A json:api compliant service might implement GET, POST, PATCH, DELETE HTTP methods on a relationship resource,
+so the `BaseRelationshipResource` comes with 4 methods that you can override:
+- `get -> handling GET /<parent_type>/<parent_id>/relationships/<relationship_name>`
+- `patch -> handling PATCH /<parent_type>/<parent_id>/relationships/<relationship_name>`
+- `delete -> handling DELETE /<parent_type>/<parent_id>/relationships/<relationship_name>`
+- `post -> handling POST /<parent_type>/<parent_id>/relationships/<relationship_name>`
+
+All methods return 405 Method Not Allowed by default.
+You can also customize `allowed_methods` to a subset of the above HTTP methods.
+
+When defining a relationship resource, the following class attributes must be set:
+- `parent_resource` -> must point to the BaseResource subclass that is exposing the parent resource
+- `relationship_name` -> must contain the relationship name, as found on `parent_resource.schema`
+
+Example:
+```python
+from marshmallow_jsonapi import fields
+from starlette.applications import Starlette
+from starlette_jsonapi.fields import JSONAPIRelationship
+from starlette_jsonapi.resource import BaseRelationshipResource, BaseResource
+from starlette_jsonapi.schema import JSONAPISchema
+
+class EmployeeSchema(JSONAPISchema):
+    class Meta:
+        type_ = 'employees'
+        self_route = 'employees:get'
+        self_route_kwargs = {'id': '<id>'}
+        self_route_many = 'employees:get_all'
+
+    id = fields.Str(dump_only=True)
+    name = fields.Str()
+
+    manager = JSONAPIRelationship(
+        type_='employees',
+        schema='EmployeeSchema',
+        include_resource_linkage=True,
+        self_route='employees:manager',
+        self_route_kwargs={'parent_id': '<id>'},
+        related_route='employees:get',
+        related_route_kwargs={'id': '<id>'},
+    )
+
+
+class EmployeeResource(BaseResource):
+    type_ = 'employees'
+    schema = EmployeeSchema    
+
+
+class EmployeeManagerResource(BaseRelationshipResource):
+    parent_resource = EmployeeResource
+    relationship_name = 'manager'
+
+
+app = Starlette()
+EmployeeResource.register_routes(app=app, base_path='/')
+EmployeeManagerResource.register_routes(app=app, base_path='/')
 ```
 
 #### Registering resource paths
