@@ -22,9 +22,9 @@ Since this project is under development, please pin your dependencies to avoid p
 - starlette friendly route generation
 - exception handlers to serialize as json:api responses
 - relationship resources 
+- sparse fields
 
 ### Todo:
-- sparse fields
 - pagination helpers
 - sorting helpers
 - documentation
