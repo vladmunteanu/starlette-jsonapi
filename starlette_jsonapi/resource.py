@@ -11,7 +11,11 @@ from starlette_jsonapi.exceptions import JSONAPIException, HTTPException
 from starlette_jsonapi.fields import JSONAPIRelationship
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
-from starlette_jsonapi.utils import parse_included_params, serialize_error
+from starlette_jsonapi.utils import (
+    parse_included_params,
+    parse_sparse_fields_params, filter_sparse_fields,
+    serialize_error,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -110,8 +114,9 @@ class BaseResource:
         included_relations = await self._prepare_included(data=data, many=many)
         schema = self.schema(app=self.request.app, include_data=included_relations)
         body = schema.dump(data, many=many)
+        sparse_body = await self.process_sparse_fields(body, many=many)
         return JSONAPIResponse(
-            content=body,
+            content=sparse_body,
         )
 
     @classmethod
@@ -224,13 +229,53 @@ class BaseResource:
         for asynchronous objects that may need fetching.
 
         Example `relations`:
-            url = /some-url?include=resource1,resource2.resource3
-            relations = ['resource1', 'resource2.resource3']
+            url = /some-url?include=resource1,resource1.resource2
+            relations = ['resource1', 'resource1.resource2']
 
         :param obj: an object that was passed to `serialize`
-        :param relations: list of relations, ex: ['resource1', 'resource2.resource3']
+        :param relations: list of relations, ex: ['resource1', 'resource1.resource2']
         """
         raise _StopInclude
+
+    # Methods used to implement sparse fields
+    # https://jsonapi.org/format/#fetching-sparse-fieldsets
+    async def process_sparse_fields(self, serialized_data: dict, many: bool = False) -> dict:
+        """
+        Processes sparse fields requests by cleaning the serialized
+        data of extra attributes and relationships.
+        """
+        sparse_fields = parse_sparse_fields_params(self.request)
+        if not sparse_fields or not serialized_data.get('data'):
+            return serialized_data
+
+        data = serialized_data['data']
+        new_data = [] if many else {}  # type: Union[List, dict]
+
+        included = serialized_data.get('included', None)
+        new_included = []
+
+        for resource_name, fields in sparse_fields.items():
+            # filter sparse fields in `data`
+            if many:
+                for item in data:
+                    if item['type'] == resource_name:
+                        new_data.append(filter_sparse_fields(item, fields))  # type: ignore
+            else:
+                if data['type'] == resource_name:
+                    new_data = filter_sparse_fields(data, fields)
+
+            # filter sparse fields in `included`
+            if included:
+                for item in included:
+                    if item['type'] == resource_name:
+                        new_included.append(filter_sparse_fields(item, fields))
+
+        new_serialized_data = serialized_data.copy()
+        new_serialized_data['data'] = new_data
+        if new_included:
+            new_serialized_data['included'] = new_included
+
+        return serialized_data
 
 
 class _StopInclude(Exception):

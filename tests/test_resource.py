@@ -1040,3 +1040,209 @@ def test_relationship_resource_register_routes_parent_registration_required(app:
         TResourceRel.register_routes(app=app)
 
     assert str(exc.value) == 'Parent resource should be registered first.'
+
+
+def test_sparse_fields(included_app: Starlette):
+    test_client = TestClient(included_app)
+    rv = test_client.get(
+        '/test-resource/foo'
+        '?fields[test-resource]=rel,name'
+    )
+    assert rv.status_code == 200
+    assert rv.json() == {
+        'data': {
+            'id': 'foo',
+            'type': 'test-resource',
+            'attributes': {
+                'name': 'foo-name',
+            },
+            'relationships': {
+                'rel': {
+                    'data': {
+                        'type': 'test-related-resource',
+                        'id': 'bar',
+                    }
+                }
+            }
+        }
+    }
+
+    rv = test_client.get(
+        '/test-resource/foo'
+        '?fields[test-resource]=name'
+    )
+    assert rv.status_code == 200
+    assert rv.json() == {
+        'data': {
+            'id': 'foo',
+            'type': 'test-resource',
+            'attributes': {
+                'name': 'foo-name',
+            }
+        }
+    }
+
+    rv = test_client.get(
+        '/test-resource/foo'
+        '?fields[test-resource]=rel'
+    )
+    assert rv.status_code == 200
+    assert rv.json() == {
+        'data': {
+            'id': 'foo',
+            'type': 'test-resource',
+            'relationships': {
+                'rel': {
+                    'data': {
+                        'type': 'test-related-resource',
+                        'id': 'bar',
+                    }
+                }
+            }
+        }
+    }
+
+
+def test_sparse_fields_field_does_not_exist(included_app: Starlette):
+    test_client = TestClient(included_app)
+    rv = test_client.get(
+        '/test-resource/foo'
+        '?fields[test-resource]=non-existent'
+    )
+    assert rv.status_code == 200
+    assert rv.json() == {
+        'data': {
+            'id': 'foo',
+            'type': 'test-resource',
+        }
+    }
+
+    rv = test_client.get(
+        '/test-resource/foo'
+        '?fields[test-resource]=non-existent,name'
+    )
+    assert rv.status_code == 200
+    assert rv.json() == {
+        'data': {
+            'id': 'foo',
+            'type': 'test-resource',
+            'attributes': {
+                'name': 'foo-name',
+            }
+        }
+    }
+
+
+def test_sparse_fields_incorrect_field(included_app: Starlette):
+    test_client = TestClient(included_app)
+    rv = test_client.get(
+        '/test-resource/foo'
+        '?fields[]=bar'
+    )
+    assert rv.status_code == 400
+    assert rv.json() == {
+        'errors': [
+            {'detail': 'Incorrect sparse fields request.'}
+        ]
+    }
+
+    rv = test_client.get(
+        '/test-resource/foo'
+        '?fields[test-resource]='
+    )
+    assert rv.status_code == 400
+    assert rv.json() == {
+        'errors': [
+            {'detail': 'Incorrect sparse fields request.'}
+        ]
+    }
+
+    rv = test_client.get(
+        '/test-resource/foo'
+        '?fields[test-resource]=,,'
+    )
+    assert rv.status_code == 400
+    assert rv.json() == {
+        'errors': [
+            {'detail': 'Incorrect sparse fields request.'}
+        ]
+    }
+
+
+def test_sparse_fields_included_data(included_app: Starlette):
+    test_client = TestClient(included_app)
+    rv = test_client.get(
+        '/test-resource/foo'
+        '?include=rel'
+        '&fields[test-resource]=name'
+    )
+    assert rv.status_code == 200
+    assert rv.json() == {
+        'data': {
+            'id': 'foo',
+            'type': 'test-resource',
+            'attributes': {
+                'name': 'foo-name',
+            }
+        },
+        'included': [
+            {
+                'id': 'bar',
+                'type': 'test-related-resource',
+                'attributes': {
+                    'description': 'bar-description',
+                }
+            }
+        ]
+    }
+
+    rv = test_client.get(
+        '/test-resource/foo'
+        '?include=rel'
+        '&fields[test-resource]=name'
+        '&fields[test-related-resource]=nothing'
+    )
+    assert rv.status_code == 200
+    assert rv.json() == {
+        'data': {
+            'id': 'foo',
+            'type': 'test-resource',
+            'attributes': {
+                'name': 'foo-name',
+            }
+        },
+        'included': [
+            {
+                'id': 'bar',
+                'type': 'test-related-resource',
+            }
+        ]
+    }
+
+
+def test_sparse_fields_many(included_app: Starlette):
+    test_client = TestClient(included_app)
+    rv = test_client.get(
+        '/test-resource/'
+        '?fields[test-resource]=name'
+    )
+    assert rv.status_code == 200
+    assert rv.json() == {
+        'data': [
+            {
+                'id': 'foo',
+                'type': 'test-resource',
+                'attributes': {
+                    'name': 'foo-name',
+                }
+            },
+            {
+                'id': 'foo2',
+                'type': 'test-resource',
+                'attributes': {
+                    'name': 'foo2-name',
+                }
+            },
+
+        ]
+    }
