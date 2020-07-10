@@ -81,7 +81,7 @@ def jsonapi_headers_app(app: Starlette):
 
         async def post(self, *args, **kwargs) -> Response:
             await self.validate_body()
-            return Response(status_code=200)
+            return Response(status_code=201)
 
         async def patch(self, id=None, *args, **kwargs) -> Response:
             await self.validate_body()
@@ -499,7 +499,7 @@ def test_method_not_allowed(app: Starlette):
             return Response(status_code=200)
 
         async def post(self, *args, **kwargs) -> Response:
-            return Response(status_code=200)
+            return Response(status_code=201)
 
     TResource.register_routes(app, '/')
 
