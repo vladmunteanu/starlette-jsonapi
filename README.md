@@ -2,12 +2,12 @@
 A minimal "framework" intended to help write [json:api](https://jsonapi.org) compliant services in async Python,
 written on top of [starlette](https://starlette.io) and [marshmallow-jsonapi](https://marshmallow-jsonapi.readthedocs.io/).
 
-In the maintainer's view, REST frameworks that come with a complete data layer implementation are quite limiting 
-and rarely usable in production systems due to business logic needs or authorization constraints. 
+In the maintainer's view, REST frameworks that come with a complete data layer implementation are quite limiting
+and rarely usable in production systems due to business logic needs or authorization constraints.
 The default implementation they come with is usually getting in the way, more than helping.
 
-Because of that, `starlette_jsonapi` does not contain a data layer implementation, so you should be able to pick 
-any available async ORM. This also means that you are going to get a very basic interface for writing a REST resource, 
+Because of that, `starlette_jsonapi` does not contain a data layer implementation, so you should be able to pick
+any available async ORM. This also means that you are going to get a very basic interface for writing a REST resource,
 with some helpers to make your experience more pleasant, but nothing fancy.
 
 ##### Installing
@@ -21,21 +21,26 @@ Since this project is under development, please pin your dependencies to avoid p
 - including related resources
 - starlette friendly route generation
 - exception handlers to serialize as json:api responses
-- relationship resources 
+- relationship resources
 - sparse fields
 
 ### Todo:
-- pagination helpers
-- sorting helpers
+- [pagination helpers](https://jsonapi.org/format/#fetching-pagination)
+- [sorting helpers](https://jsonapi.org/format/#fetching-sorting)
 - documentation
 - examples for other ORMs
+- [support meta objects](https://jsonapi.org/format/#document-meta)
+- [support json objects](https://jsonapi.org/format/#document-jsonapi-object)
+- [enforce member name validation](https://jsonapi.org/format/#document-member-names)
+- [optionally enforce query name validation](https://jsonapi.org/format/#query-parameters)
+- [support client generated ids](https://jsonapi.org/format/#crud-creating-client-ids)
 
 ## Documentation
 You should take a look at the [examples](examples) directory for implementations.
 
 ### Defining a schema
 After you've decided which ORM to use, you can start writing the associated schemas
-using the marshmallow_jsonapi library (which itself is extending [marshmallow](https://marshmallow.readthedocs.io/)).  
+using the marshmallow_jsonapi library (which itself is extending [marshmallow](https://marshmallow.readthedocs.io/)).
 
 ```python
 from marshmallow_jsonapi import fields
@@ -56,14 +61,14 @@ class ChildExampleSchema(JSONAPISchema):
 
     id = fields.Str(dump_only=True)
     name = fields.Str()
-    
+
     parent = JSONAPIRelationship(
         type_='examples',
         schema='ExampleSchema',
         include_resource_linkage=True,
         required=True,
-        # `id_attribute` can be specified in order to allow serializing 
-        # relationships even when the related object is not available. 
+        # `id_attribute` can be specified in order to allow serializing
+        # relationships even when the related object is not available.
         # See the `sample-tortoise-orm` example for more information.
     )
 ```
@@ -123,12 +128,12 @@ class ExampleResource(BaseResource):
         if not example:
             raise ResourceNotFound
         return await self.serialize(example)
-    
+
     async def patch(self, id=None, *args, **kwargs):
         example = examples_db.get(id)
         if not example:
             raise ResourceNotFound
-        
+
         body = await self.deserialize_body(partial=True)
         if body.get('some_optional_field'):
             example['some_optional_field'] = body.get('some_optional_field')
@@ -145,8 +150,8 @@ class ExampleResource(BaseResource):
 
     async def get_all(self, *args, **kwargs):
         examples = list(examples_db.values())
-        return self.serialize(examples, many=True) 
-    
+        return self.serialize(examples, many=True)
+
     async def post(self, *args, **kwargs):
         global last_id
         body = await self.deserialize_body()
@@ -154,7 +159,7 @@ class ExampleResource(BaseResource):
         example = {'id': last_id}
         if body.get('some_optional_field'):
             example['some_optional_field'] = body.get('some_optional_field')
-        
+
         # We didn't ask for a partial deserialization, so a required field shouldn't throw a KeyError
         example['some_required_field'] = body['some_required_field']
         examples_db[example['id']] = example
@@ -210,7 +215,7 @@ class EmployeeSchema(JSONAPISchema):
 
 class EmployeeResource(BaseResource):
     type_ = 'employees'
-    schema = EmployeeSchema    
+    schema = EmployeeSchema
 
 
 class EmployeeManagerResource(BaseRelationshipResource):
@@ -279,6 +284,6 @@ This project is in its early days, so **any** help is appreciated.
 ### Running tests:
 As simple as running ```tox```.
 
-If you plan to use pyenv and want to run tox for multiple python versions, 
-you can create multiple virtual environments and then make them available to tox by running 
+If you plan to use pyenv and want to run tox for multiple python versions,
+you can create multiple virtual environments and then make them available to tox by running
 something like: `pyenv shell starlette_jsonapi_venv36 starlette_jsonapi_venv37`.
