@@ -159,14 +159,14 @@ def serialization_app(app: Starlette):
         schema = TSchema
 
         async def get_all(self, *args, **kwargs) -> Response:
-            return await self.serialize([dict(id=1, name='foo')], many=True)
+            return await self.serialize_to_response([dict(id=1, name='foo')], many=True)
 
         async def get(self, id=None, *args, **kwargs) -> Response:
-            return await self.serialize(dict(id=id, name='foo'))
+            return await self.serialize_to_response(dict(id=id, name='foo'))
 
         async def post(self, *args, **kwargs) -> Response:
             body = await self.deserialize_body()
-            return await self.serialize(dict(id=1, name=body.get('name')))
+            return await self.serialize_to_response(dict(id=1, name=body.get('name')))
 
     TResource.register_routes(app, '/')
     return app
@@ -299,12 +299,12 @@ def included_app(app: Starlette):
             return None
 
         async def get(self, id=None, *args, **kwargs) -> Response:
-            return await self.serialize(
+            return await self.serialize_to_response(
                 dict(id='foo', name='foo-name', rel=dict(id='bar', description='bar-description'))
             )
 
         async def get_all(self, *args, **kwargs) -> Response:
-            return await self.serialize(
+            return await self.serialize_to_response(
                 [
                     dict(id='foo', name='foo-name', rel=dict(id='bar', description='bar-description')),
                     dict(id='foo2', name='foo2-name', rel=dict(id='bar2', description='bar2-description')),
@@ -317,12 +317,12 @@ def included_app(app: Starlette):
         schema = TSchema
 
         async def get(self, id=None, *args, **kwargs) -> Response:
-            return await self.serialize(
+            return await self.serialize_to_response(
                 dict(id='foo', name='foo-name', rel=dict(id='bar', description='bar-description'))
             )
 
         async def get_all(self, *args, **kwargs) -> Response:
-            return await self.serialize(
+            return await self.serialize_to_response(
                 [dict(id='foo2', name='foo2-name', rel=dict(id='bar2', description='bar2-description'))],
                 many=True
             )
@@ -554,7 +554,7 @@ def relationship_app(app: Starlette):
         relationship_name = 'rel'
 
         async def get(self, parent_id: str, *args, **kwargs) -> Response:
-            return await self.serialize(
+            return await self.serialize_to_response(
                 dict(
                     id='foo', name='foo-name',
                     rel=dict(id='bar', description='bar-description'),
@@ -567,7 +567,7 @@ def relationship_app(app: Starlette):
                 relationship = None
             else:
                 relationship = dict(id=relationship_id, description='bar-description')
-            return await self.serialize(
+            return await self.serialize_to_response(
                 dict(
                     id=parent_id, name='foo-name',
                     rel=relationship,
@@ -691,7 +691,7 @@ def relationship_many_app(app: Starlette):
         relationship_name = 'rel_many'
 
         async def get(self, parent_id: str, *args, **kwargs) -> Response:
-            return await self.serialize(
+            return await self.serialize_to_response(
                 dict(
                     id='foo',
                     name='foo-name',
@@ -717,7 +717,7 @@ def relationship_many_app(app: Starlette):
             else:
                 relationships = []
 
-            return await self.serialize(
+            return await self.serialize_to_response(
                 dict(
                     id=parent_id,
                     name='foo-name',

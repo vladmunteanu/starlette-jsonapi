@@ -109,14 +109,36 @@ class BaseResource:
             raise JSONAPIException(status_code=400, errors=errors.get('errors'))
         return body
 
-    async def serialize(self, data: Any, many=False) -> JSONAPIResponse:
-        """ Serializes data as a JSON:API payload and returns a JSONAPIResponse which can be served to clients. """
+    async def serialize(self, data: Any, many=False, *args, **kwargs) -> dict:
+        """
+        Serializes data as a JSON:API payload and returns a `dict`
+        which can be passed when calling `BaseResource.to_response`.
+
+        Additional args and kwargs are passed to the `marshmallow` based Schema.
+        """
         included_relations = await self._prepare_included(data=data, many=many)
-        schema = self.schema(app=self.request.app, include_data=included_relations)
+        schema = self.schema(app=self.request.app, include_data=included_relations, *args, **kwargs)
         body = schema.dump(data, many=many)
         sparse_body = await self.process_sparse_fields(body, many=many)
+        return sparse_body
+
+    async def serialize_to_response(self, data: Any, many=False, *args, **kwargs) -> JSONAPIResponse:
+        """
+        Helper method which calls `self.serialize` and then `self.to_response`.
+        Additional args and kwargs are passed to `serialize` and `to_response`.
+        """
+        serialized_body = await self.serialize(data, many=many, *args, **kwargs)  # type: ignore
+        response = await self.to_response(serialized_body, *args, **kwargs)
+        return response
+
+    async def to_response(self, data: dict, *args, **kwargs) -> JSONAPIResponse:
+        """
+        Wraps `data` in a JSONAPIResponse object and returns it.
+        Additional args and kwargs are passed to the `starlette` based Response.
+        """
         return JSONAPIResponse(
-            content=sparse_body,
+            content=data,
+            *args, **kwargs,
         )
 
     @classmethod
@@ -317,14 +339,32 @@ class BaseRelationshipResource:
             raise AttributeError(f'Parent schema does not define `{self.relationship_name}` relationship.')
         return relationship
 
-    async def serialize(self, data: Any, many=False) -> JSONAPIResponse:
+    async def serialize(self, data: Any) -> dict:
         """
-        Serializes relationship for an object represented by the parent resource.
+        Serializes the parent instance relationships as a JSON:API payload, returning
+        a `dict` which can be passed to `BaseRelationshipResource.to_response`.
         """
         relationship = self._get_relationship_field()
         body = relationship.serialize(self.relationship_name, data)
+        return body
+
+    async def serialize_to_response(self, data: Any, *args, **kwargs):
+        """
+        Helper method which calls `self.serialize` and then `self.to_response`.
+        Additional args and kwargs are passed `BaseRelationshipResource.to_response`.
+        """
+        serialized_relationship = await self.serialize(data)
+        response = await self.to_response(serialized_relationship, *args, **kwargs)
+        return response
+
+    async def to_response(self, data: dict, *args, **kwargs) -> JSONAPIResponse:
+        """
+        Wraps `data` in a JSONAPIResponse object and returns it.
+        Additional args and kwargs are passed to the `starlette` based Response.
+        """
         return JSONAPIResponse(
-            content=body,
+            content=data,
+            *args, **kwargs,
         )
 
     async def deserialize_ids(self) -> Union[None, str, List[str]]:
