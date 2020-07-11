@@ -150,7 +150,7 @@ class ExampleResource(BaseResource):
 
     async def get_all(self, *args, **kwargs):
         examples = list(examples_db.values())
-        return self.serialize(examples, many=True)
+        return await self.serialize(examples, many=True)
 
     async def post(self, *args, **kwargs):
         global last_id
