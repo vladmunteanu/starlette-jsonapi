@@ -348,7 +348,7 @@ class BaseRelationshipResource:
         body = relationship.serialize(self.relationship_name, data)
         return body
 
-    async def serialize_to_response(self, data: Any, *args, **kwargs):
+    async def serialize_to_response(self, data: Any, *args, **kwargs) -> JSONAPIResponse:
         """
         Helper method which calls `self.serialize` and then `self.to_response`.
         Additional args and kwargs are passed `BaseRelationshipResource.to_response`.
