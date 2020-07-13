@@ -1,5 +1,5 @@
 import logging
-from typing import Type, Any, List, Optional, Union
+from typing import Type, Any, List, Optional, Union, Dict
 
 from marshmallow.exceptions import ValidationError
 from starlette.applications import Starlette
@@ -9,6 +9,7 @@ from starlette.routing import Route, Mount
 
 from starlette_jsonapi.exceptions import JSONAPIException, HTTPException
 from starlette_jsonapi.fields import JSONAPIRelationship
+from starlette_jsonapi.meta import MetaRegisterResource
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
 from starlette_jsonapi.utils import (
@@ -20,7 +21,7 @@ from starlette_jsonapi.utils import (
 logger = logging.getLogger(__name__)
 
 
-class BaseResource:
+class BaseResource(metaclass=MetaRegisterResource):
     """ A basic json:api resource implementation, data layer agnostic. """
 
     # The json:api type, used to compute the path for this resource
@@ -45,7 +46,7 @@ class BaseResource:
     # 'str', 'int', 'float', 'uuid', 'path'
     id_mask: str = 'str'
 
-    # Optional, by default this will equal `type_` and will be used to register the Mount name.
+    # Optional, by default this will equal `type_` and will be used as the `mount` name.
     # Impacts the result of `url_path_for`, so it can be used to support multiple resource versions.
     # For example:
     # ```
@@ -61,6 +62,19 @@ class BaseResource:
     # ```
     # `url_path_for` will
     register_as: str = ''
+    mount: Mount
+
+    # Switch for controlling meta class registration.
+    # Being able to refer to another resource via its name,
+    # rather than directly passing it, will prevent circular imports in projects.
+    # By default, subclasses are registered.
+    register_resource = False
+
+    # This will be populated when routes are registered.
+    # We only need this because starlette doesn't yet allow us to use partials
+    # or to pass something to the handler when setting up a route,
+    # and we want to return 404 errors if the related resource doesn't actually exist.
+    _related: Dict[str, Type['BaseResource']]
 
     def __init__(self, request: Request, *args, **kwargs) -> None:
         self.request = request
@@ -78,6 +92,16 @@ class BaseResource:
         raise JSONAPIException(status_code=405)
 
     async def post(self, *args, **kwargs) -> Response:
+        raise JSONAPIException(status_code=405)
+
+    async def get_related_id(self, id: Any, relationship: str, *args, **kwargs) -> Any:
+        """
+        Subclasses should implement this if they specify relationships
+        and want to support fetching related resources.
+        The return value should be the id of the related resource,
+        which will then be passed through the related resource's GET /<id> handler.
+        By default returns a 405 error.
+        """
         raise JSONAPIException(status_code=405)
 
     async def deserialize_body(self, partial=None) -> dict:
@@ -170,38 +194,74 @@ class BaseResource:
         return await cls.handle_request(handler_name='post', request=request)
 
     @classmethod
+    async def handle_get_related(cls, request: Request):
+        """ Handles related resources requests, such as /articles/1/author. """
+        id_ = request.path_params.get('id')
+        relationship = request.path_params.get('relationship')
+        try:
+            if relationship not in cls._related:
+                raise JSONAPIException(status_code=404)
+            resource = cls(request)
+            related_id = await resource.get_related_id(id=id_, relationship=relationship)  # type: Any
+            related_resource = cls._related[relationship](request)
+            response = await related_resource.get(id=related_id)
+        except Exception as e:
+            response = await cls.handle_error(request=request, exc=e)
+        return response
+
+    @classmethod
     def register_routes(cls, app: Starlette, base_path: str):
-        if not cls.type_:
-            raise Exception('Cannot register a resource without specifying its `type_`.')
-        name = cls.register_as or cls.type_
-        app.routes.append(
-            Mount(
-                name=name,
-                path='{}/{}'.format(base_path.rstrip('/'), cls.type_),
-                routes=[
-                    Route(
-                        '/{{id:{}}}'.format(cls.id_mask), cls.handle_get,
-                        methods=['GET'], name='get',
-                    ),
-                    Route(
-                        '/{{id:{}}}'.format(cls.id_mask), cls.handle_patch,
-                        methods=['PATCH'], name='patch',
-                    ),
-                    Route(
-                        '/{{id:{}}}'.format(cls.id_mask), cls.handle_delete,
-                        methods=['DELETE'], name='delete',
-                    ),
-                    Route(
-                        '/', cls.handle_get_all,
-                        methods=['GET'], name='get_all',
-                    ),
-                    Route(
-                        '/', cls.handle_post,
-                        methods=['POST'], name='post',
-                    ),
-                ],
+        if not cls.type_ or not cls.schema:
+            raise Exception('Cannot register a resource without specifying its `type_` and its `schema`.')
+
+        # find relationships with `related_resource` specified
+        cls._related = {}
+        for fname, field in cls.schema.get_fields().items():
+            if isinstance(field, JSONAPIRelationship):
+                if field.related_resource:
+                    cls._related[fname] = field.related_resource_class
+        # attach related routes, example: /articles/1/author
+        routes = [
+            Route(
+                '/{{id:{}}}/{{relationship:str}}'.format(cls.id_mask),
+                cls.handle_get_related,
+                methods=['GET'],
+                name=rel,
             )
+            for rel in cls._related
+        ]
+        # attach primary routes, example: /articles/ and /articles/1
+        routes += [
+            Route(
+                '/{{id:{}}}'.format(cls.id_mask), cls.handle_get,
+                methods=['GET'], name='get',
+            ),
+            Route(
+                '/{{id:{}}}'.format(cls.id_mask), cls.handle_patch,
+                methods=['PATCH'], name='patch',
+            ),
+            Route(
+                '/{{id:{}}}'.format(cls.id_mask), cls.handle_delete,
+                methods=['DELETE'], name='delete',
+            ),
+            Route(
+                '/', cls.handle_get_all,
+                methods=['GET'], name='get_all',
+            ),
+            Route(
+                '/', cls.handle_post,
+                methods=['POST'], name='post',
+            ),
+        ]
+
+        name = cls.register_as or cls.type_
+        cls.mount = Mount(
+            name=name,
+            path='{}/{}'.format(base_path.rstrip('/'), cls.type_),
+            routes=routes,
         )
+
+        app.routes.append(cls.mount)
 
     # Methods used to generate compound documents
     # https://jsonapi.org/format/#document-compound-documents
@@ -389,23 +449,18 @@ class BaseRelationshipResource:
                 'Cannot register a relationship resource if the `parent_resource` does not specify a `type_`.'
             )
 
-        parent_name = cls.parent_resource.register_as or cls.parent_resource.type_
-
-        # find the parent mount and append the new Route to it
-        for route in app.routes:
-            if isinstance(route, Mount):
-                if getattr(route, 'name', None) == parent_name:
-                    route.routes.append(
-                        Route(
-                            name=cls.relationship_name,
-                            path='/{{parent_id:{}}}/relationships/{}'.format(
-                                cls.parent_resource.id_mask,
-                                cls.relationship_name
-                            ),
-                            endpoint=cls.handle_request,
-                            methods=['GET', 'POST', 'PATCH', 'DELETE'],
-                        )
-                    )
-                    break
-        else:
+        if not getattr(cls.parent_resource, 'mount', None):
             raise Exception('Parent resource should be registered first.')
+
+        name = f'relationships-{cls.relationship_name}'
+        cls.parent_resource.mount.routes.append(
+            Route(
+                name=name,
+                path='/{{parent_id:{}}}/relationships/{}'.format(
+                    cls.parent_resource.id_mask,
+                    cls.relationship_name
+                ),
+                endpoint=cls.handle_request,
+                methods=['GET', 'POST', 'PATCH', 'DELETE'],
+            )
+        )

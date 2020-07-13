@@ -1,4 +1,7 @@
+from typing import Dict
+
 from marshmallow import EXCLUDE
+from marshmallow.fields import Field
 from marshmallow_jsonapi import Schema as __Schema, SchemaOpts as __SchemaOpts
 from starlette.applications import Starlette
 
@@ -69,3 +72,7 @@ class JSONAPISchema(__Schema):
         if links and isinstance(links, dict) and links.get('self'):
             return links
         return None
+
+    @classmethod
+    def get_fields(cls) -> Dict[str, Field]:
+        return cls._declared_fields

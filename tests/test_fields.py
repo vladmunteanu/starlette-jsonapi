@@ -67,7 +67,10 @@ def test_jsonapi_relationship_routes(app: Starlette):
 
     class OtherResource(BaseResource):
         type_ = 'others'
+        schema = OtherSchema
+
     OtherResource.register_routes(app, '/')
+    assert len(OtherResource.mount.routes) == 5
 
     class FooSchema(JSONAPISchema):
         id = fields.Str()
@@ -75,8 +78,10 @@ def test_jsonapi_relationship_routes(app: Starlette):
             schema='OtherSchema',
             include_resource_linkage=True,
             type_='others',
-            related_route='others:get',
-            related_route_kwargs={'id': '<rel_id>'},
+            self_route='',
+            related_resource='OtherResource',
+            related_route='foo:rel',
+            related_route_kwargs={'id': '<id>'},
             id_attribute='rel_id',
         )
 
@@ -88,10 +93,12 @@ def test_jsonapi_relationship_routes(app: Starlette):
 
     class FooResource(BaseResource):
         type_ = 'foo'
+        schema = FooSchema
+
     FooResource.register_routes(app, '/')
+    assert len(FooResource.mount.routes) == 6  # 5 from the resource + 1 related
 
-    d = FooSchema(app=app).dump(dict(rel=dict(id='bar'), rel_id='bar', id='foo'))
-
+    d = FooSchema(app=app).dump(dict(rel=dict(id='bar'), rel_id='bar', id='foo_id'))
     assert d['data']['relationships'] == {
         'rel': {
             'data': {
@@ -99,7 +106,7 @@ def test_jsonapi_relationship_routes(app: Starlette):
                 'id': 'bar',
             },
             'links': {
-                'related': '/others/bar',
+                'related': '/foo/foo_id/rel',
             }
         }
     }
