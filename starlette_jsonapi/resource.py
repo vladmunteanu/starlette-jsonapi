@@ -101,7 +101,7 @@ class BaseResource:
             body = await self.request.json()
         except Exception:
             logger.debug('Could not read request body.', exc_info=True)
-            raise JSONAPIException(status_code=400, detail='Could not read request body.')
+            raise JSONAPIException(status_code=400, detail='Could not read request body as JSON.')
 
         errors = self.schema(app=self.request.app).validate(body, partial=partial)
         if errors:

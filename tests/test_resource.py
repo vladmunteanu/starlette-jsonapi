@@ -263,7 +263,7 @@ def test_deserialize_raises_validation_errors(serialization_app: Starlette):
     assert rv.json() == {
         'errors': [
             {
-                'detail': 'Could not read request body.',
+                'detail': 'Could not read request body as JSON.',
             }
         ]
     }
