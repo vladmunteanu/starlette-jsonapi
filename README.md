@@ -30,7 +30,7 @@ Since this project is under development, please pin your dependencies to avoid p
 - documentation
 - examples for other ORMs
 - [support meta objects](https://jsonapi.org/format/#document-meta)
-- [support json objects](https://jsonapi.org/format/#document-jsonapi-object)
+- [support jsonapi objects](https://jsonapi.org/format/#document-jsonapi-object)
 - [enforce member name validation](https://jsonapi.org/format/#document-member-names)
 - [optionally enforce query name validation](https://jsonapi.org/format/#query-parameters)
 - [support client generated ids](https://jsonapi.org/format/#crud-creating-client-ids)
