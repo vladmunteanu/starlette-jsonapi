@@ -122,15 +122,6 @@ class BaseResource:
         sparse_body = await self.process_sparse_fields(body, many=many)
         return sparse_body
 
-    async def serialize_to_response(self, data: Any, many=False, *args, **kwargs) -> JSONAPIResponse:
-        """
-        Helper method which calls `self.serialize` and then `self.to_response`.
-        Additional args and kwargs are passed to `serialize` and `to_response`.
-        """
-        serialized_body = await self.serialize(data, many=many, *args, **kwargs)  # type: ignore
-        response = await self.to_response(serialized_body, *args, **kwargs)
-        return response
-
     async def to_response(self, data: dict, *args, **kwargs) -> JSONAPIResponse:
         """
         Wraps `data` in a JSONAPIResponse object and returns it.
@@ -347,15 +338,6 @@ class BaseRelationshipResource:
         relationship = self._get_relationship_field()
         body = relationship.serialize(self.relationship_name, data)
         return body
-
-    async def serialize_to_response(self, data: Any, *args, **kwargs) -> JSONAPIResponse:
-        """
-        Helper method which calls `self.serialize` and then `self.to_response`.
-        Additional args and kwargs are passed `BaseRelationshipResource.to_response`.
-        """
-        serialized_relationship = await self.serialize(data)
-        response = await self.to_response(serialized_relationship, *args, **kwargs)
-        return response
 
     async def to_response(self, data: dict, *args, **kwargs) -> JSONAPIResponse:
         """
