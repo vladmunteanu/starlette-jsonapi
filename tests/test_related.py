@@ -588,6 +588,17 @@ def test_related_resource_default_not_allowed(relationship_links_app: Starlette)
     assert rv.status_code == 405
 
 
+def test_related_resource_relationship_not_found(relationship_links_app: Starlette):
+    test_client = TestClient(relationship_links_app)
+    rv = test_client.get('/test-resource/1/non-existing-rel')
+    assert rv.status_code == 404
+    assert rv.json() == {
+        'errors': [
+            {'detail': 'Not Found'}
+        ]
+    }
+
+
 def test_get_related_resource(relationship_links_app: Starlette):
     from starlette_jsonapi import meta
 
@@ -623,11 +634,54 @@ def test_get_related_resource(relationship_links_app: Starlette):
         }
     }
 
+
+def test_get_related_resource_many(relationship_links_app: Starlette):
+    from starlette_jsonapi import meta
+
+    async def get_related(self, id, relationship, *args, **kwargs):
+        return await self.to_response(
+            # we serialize the related object directly
+            await self.serialize_related(
+                [
+                    dict(id='related-item-id', description='related-item-description'),
+                    dict(id='related-item-id-2', description='related-item-description-2'),
+                ],
+                relationship=relationship,
+                many=True,
+            )
+        )
+
+    TResource = meta.registered_resources.get('TResource')
+    assert TResource is not None
+    setattr(TResource, 'get_related', get_related)
+
     test_client = TestClient(relationship_links_app)
-    rv = test_client.get('/test-resource/1/non-existing-rel')
-    assert rv.status_code == 404
+    rv = test_client.get('/test-resource/1/rel')
+    assert rv.status_code == 200
     assert rv.json() == {
-        'errors': [
-            {'detail': 'Not Found'}
-        ]
+        'data': [
+            {
+                'id': 'related-item-id',
+                'type': 'test-related-resource',
+                'attributes': {
+                    'description': 'related-item-description',
+                },
+                'links': {
+                    'self': '/test-related-resource/related-item-id',
+                }
+            },
+            {
+                'id': 'related-item-id-2',
+                'type': 'test-related-resource',
+                'attributes': {
+                    'description': 'related-item-description-2',
+                },
+                'links': {
+                    'self': '/test-related-resource/related-item-id-2',
+                }
+            }
+        ],
+        'links': {
+            'self': '/test-related-resource/',
+        }
     }
