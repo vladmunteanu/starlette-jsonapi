@@ -54,7 +54,7 @@ class TeamsResource(BaseResource):
         if not team:
             raise TeamNotFound
 
-        return await self.serialize(data=team)
+        return await self.to_response(await self.serialize(data=team))
 
     async def patch(self, id=None, *args, **kwargs) -> Response:
         if not id:
@@ -80,7 +80,7 @@ class TeamsResource(BaseResource):
 
         team.save()
 
-        return await self.serialize(data=team)
+        return await self.to_response(await self.serialize(data=team))
 
     async def delete(self, id=None, *args, **kwargs) -> Response:
         if not id:
@@ -95,7 +95,7 @@ class TeamsResource(BaseResource):
 
     async def get_all(self, *args, **kwargs) -> Response:
         teams = Team.get_items()
-        return await self.serialize(data=teams, many=True)
+        return await self.to_response(await self.serialize(data=teams, many=True))
 
     async def post(self, *args, **kwargs) -> Response:
         json_body = await self.deserialize_body()
@@ -117,8 +117,7 @@ class TeamsResource(BaseResource):
         team.save()
 
         result = await self.serialize(data=team)
-        result.status_code = 201
-        return result
+        return await self.to_response(result, status_code=201)
 
 
 class TeamUsersResource(BaseRelationshipResource):
@@ -129,7 +128,7 @@ class TeamUsersResource(BaseRelationshipResource):
         team = Team.get_item(int(parent_id))
         if not team:
             raise TeamNotFound
-        return await self.serialize(data=team)
+        return await self.to_response(await self.serialize(data=team))
 
     async def patch(self, parent_id: str, *args, **kwargs) -> Response:
         team = Team.get_item(int(parent_id))
@@ -148,7 +147,7 @@ class TeamUsersResource(BaseRelationshipResource):
                 users.append(user)
         team.users = users
         team.save()
-        return await self.serialize(data=team)
+        return await self.to_response(await self.serialize(data=team))
 
     async def post(self, parent_id: str, *args, **kwargs) -> Response:
         team = Team.get_item(int(parent_id))
@@ -167,7 +166,7 @@ class TeamUsersResource(BaseRelationshipResource):
                 users.append(user)
         team.users = users
         team.save()
-        return await self.serialize(data=team)
+        return await self.to_response(await self.serialize(data=team))
 
     async def delete(self, parent_id: str, *args, **kwargs) -> Response:
         team = Team.get_item(int(parent_id))
@@ -182,4 +181,4 @@ class TeamUsersResource(BaseRelationshipResource):
                 users.append(user)
         team.users = users
         team.save()
-        return await self.serialize(data=team)
+        return await self.to_response(await self.serialize(data=team))
