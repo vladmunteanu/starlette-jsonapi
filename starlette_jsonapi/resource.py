@@ -9,7 +9,7 @@ from starlette.routing import Route, Mount
 
 from starlette_jsonapi.exceptions import JSONAPIException, HTTPException
 from starlette_jsonapi.fields import JSONAPIRelationship
-from starlette_jsonapi.meta import MetaRegisterResource
+from starlette_jsonapi.meta import RegisteredResourceMeta
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
 from starlette_jsonapi.utils import (
@@ -21,7 +21,7 @@ from starlette_jsonapi.utils import (
 logger = logging.getLogger(__name__)
 
 
-class BaseResource(metaclass=MetaRegisterResource):
+class BaseResource(metaclass=RegisteredResourceMeta):
     """ A basic json:api resource implementation, data layer agnostic. """
 
     # The json:api type, used to compute the path for this resource
