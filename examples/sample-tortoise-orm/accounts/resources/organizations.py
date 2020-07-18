@@ -35,7 +35,7 @@ class OrganizationsResource(BaseResource):
         except DoesNotExist:
             raise OrganizationNotFound
 
-        return await self.serialize(data=organization)
+        return await self.to_response(await self.serialize(data=organization))
 
     async def patch(self, id=None, *args, **kwargs) -> Response:
         if not id:
@@ -58,7 +58,7 @@ class OrganizationsResource(BaseResource):
 
         await organization.save()
 
-        return await self.serialize(data=organization)
+        return await self.to_response(await self.serialize(data=organization))
 
     async def delete(self, id=None, *args, **kwargs) -> Response:
         if not id:
@@ -74,7 +74,7 @@ class OrganizationsResource(BaseResource):
 
     async def get_all(self, *args, **kwargs) -> Response:
         organizations = await Organization.all()
-        return await self.serialize(data=organizations, many=True)
+        return await self.to_response(await self.serialize(data=organizations, many=True))
 
     async def post(self, *args, **kwargs) -> Response:
         json_body = await self.deserialize_body()
@@ -92,5 +92,4 @@ class OrganizationsResource(BaseResource):
         await organization.save()
 
         response = await self.serialize(data=organization)
-        response.status_code = 201
-        return response
+        return await self.to_response(response, status_code=201)

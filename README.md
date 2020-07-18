@@ -127,7 +127,7 @@ class ExampleResource(BaseResource):
         example = examples_db.get(id)
         if not example:
             raise ResourceNotFound
-        return await self.serialize(example)
+        return await self.to_response(await self.serialize(example))
 
     async def patch(self, id=None, *args, **kwargs):
         example = examples_db.get(id)
@@ -140,7 +140,7 @@ class ExampleResource(BaseResource):
         if body.get('some_required_field'):
             example['some_required_field'] = body.get('some_required_field')
 
-        return await self.serialize(example)
+        return await self.to_response(await self.serialize(example))
 
     async def delete(self, id=None, *args, **kwargs):
         example = examples_db.pop(id, None)
@@ -150,7 +150,7 @@ class ExampleResource(BaseResource):
 
     async def get_all(self, *args, **kwargs):
         examples = list(examples_db.values())
-        return await self.serialize(examples, many=True)
+        return await self.to_response(await self.serialize(examples, many=True))
 
     async def post(self, *args, **kwargs):
         global last_id
@@ -164,7 +164,7 @@ class ExampleResource(BaseResource):
         example['some_required_field'] = body['some_required_field']
         examples_db[example['id']] = example
 
-        return await self.serialize(example)
+        return await self.to_response(await self.serialize(example), status_code=201)
 ```
 
 ### Defining a relationship resource

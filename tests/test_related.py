@@ -42,12 +42,12 @@ def relationship_app(app: Starlette):
         relationship_name = 'rel'
 
         async def get(self, parent_id: str, *args, **kwargs) -> Response:
-            return await self.serialize(
+            return await self.to_response(await self.serialize(
                 dict(
                     id='foo', name='foo-name',
                     rel=dict(id='bar', description='bar-description'),
                 )
-            )
+            ))
 
         async def post(self, parent_id: str, *args, **kwargs) -> Response:
             relationship_id = await self.deserialize_ids()
@@ -55,12 +55,12 @@ def relationship_app(app: Starlette):
                 relationship = None
             else:
                 relationship = dict(id=relationship_id, description='bar-description')
-            return await self.serialize(
+            return await self.to_response(await self.serialize(
                 dict(
                     id=parent_id, name='foo-name',
                     rel=relationship,
                 )
-            )
+            ))
 
     TResource.register_routes(app, '/')
     TResourceRel.register_routes(app)
@@ -179,7 +179,7 @@ def relationship_many_app(app: Starlette):
         relationship_name = 'rel_many'
 
         async def get(self, parent_id: str, *args, **kwargs) -> Response:
-            return await self.serialize(
+            return await self.to_response(await self.serialize(
                 dict(
                     id='foo',
                     name='foo-name',
@@ -188,7 +188,7 @@ def relationship_many_app(app: Starlette):
                         dict(id='bar2', description='bar2-description'),
                     ],
                 )
-            )
+            ))
 
         async def post(self, parent_id: str, *args, **kwargs) -> Response:
             relationship_ids = await self.deserialize_ids()
@@ -205,13 +205,13 @@ def relationship_many_app(app: Starlette):
             else:
                 relationships = []
 
-            return await self.serialize(
+            return await self.to_response(await self.serialize(
                 dict(
                     id=parent_id,
                     name='foo-name',
                     rel_many=relationships,
                 )
-            )
+            ))
 
     TResource.register_routes(app, '/')
     TResourceRel.register_routes(app)
@@ -593,7 +593,7 @@ def test_get_related_resource(relationship_links_app: Starlette):
     setattr(TResource, 'get_related_id', get_related_id)
 
     async def get(self, id=None, *args, **kwargs):
-        return await self.serialize({'id': id, 'description': 'test-description'})
+        return await self.to_response(await self.serialize({'id': id, 'description': 'test-description'}))
 
     TRelatedResource = meta.registered_resources.get('TRelatedResource')
     assert TRelatedResource is not None
