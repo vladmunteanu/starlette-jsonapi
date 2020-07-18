@@ -538,6 +538,9 @@ def relationship_links_app(app: Starlette):
 
         class Meta:
             type_ = 'test-related-resource'
+            self_route = 'test-related-resource:get'
+            self_route_kwargs = {'id': '<id>'}
+            self_route_many = 'test-related-resource:get_all'
 
     class TRelatedResource(BaseResource):
         type_ = 'test-related-resource'
@@ -560,6 +563,9 @@ def relationship_links_app(app: Starlette):
 
         class Meta:
             type_ = 'test-resource'
+            self_route = 'test-resource:get'
+            self_route_kwargs = {'id': '<id>'}
+            self_route_many = 'test-resource:get_all'
 
     class TResource(BaseResource):
         type_ = 'test-resource'
@@ -585,30 +591,35 @@ def test_related_resource_default_not_allowed(relationship_links_app: Starlette)
 def test_get_related_resource(relationship_links_app: Starlette):
     from starlette_jsonapi import meta
 
-    async def get_related_id(self, id, relationship, *args, **kwargs):
-        return 'foo_id'
+    async def get_related(self, id, relationship, *args, **kwargs):
+        return await self.to_response(
+            # we serialize the related object directly
+            await self.serialize_related(
+                dict(id='related-item-id', description='related-item-description'),
+                relationship=relationship,
+            )
+        )
 
     TResource = meta.registered_resources.get('TResource')
     assert TResource is not None
-    setattr(TResource, 'get_related_id', get_related_id)
-
-    async def get(self, id=None, *args, **kwargs):
-        return await self.to_response(await self.serialize({'id': id, 'description': 'test-description'}))
-
-    TRelatedResource = meta.registered_resources.get('TRelatedResource')
-    assert TRelatedResource is not None
-    setattr(TRelatedResource, 'get', get)
+    setattr(TResource, 'get_related', get_related)
 
     test_client = TestClient(relationship_links_app)
     rv = test_client.get('/test-resource/1/rel')
     assert rv.status_code == 200
     assert rv.json() == {
         'data': {
-            'id': 'foo_id',
+            'id': 'related-item-id',
             'type': 'test-related-resource',
             'attributes': {
-                'description': 'test-description',
+                'description': 'related-item-description',
+            },
+            'links': {
+                'self': '/test-related-resource/related-item-id',
             }
+        },
+        'links': {
+            'self': '/test-related-resource/related-item-id',
         }
     }
 

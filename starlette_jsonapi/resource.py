@@ -94,12 +94,10 @@ class BaseResource(metaclass=MetaRegisterResource):
     async def post(self, *args, **kwargs) -> Response:
         raise JSONAPIException(status_code=405)
 
-    async def get_related_id(self, id: Any, relationship: str, *args, **kwargs) -> Any:
+    async def get_related(self, id: Any, relationship: str, *args, **kwargs) -> Response:
         """
         Subclasses should implement this if they specify relationships
         and want to support fetching related resources.
-        The return value should be the id of the related resource,
-        which will then be passed through the related resource's GET /<id> handler.
         By default returns a 405 error.
         """
         raise JSONAPIException(status_code=405)
@@ -143,6 +141,22 @@ class BaseResource(metaclass=MetaRegisterResource):
         included_relations = await self._prepare_included(data=data, many=many)
         schema = self.schema(app=self.request.app, include_data=included_relations, *args, **kwargs)
         body = schema.dump(data, many=many)
+        sparse_body = await self.process_sparse_fields(body, many=many)
+        return sparse_body
+
+    async def serialize_related(self, data: Any, relationship: str, many=False, *args, **kwargs) -> dict:
+        """
+        Serializes related data as a JSON:API payload and returns a `dict`
+        which can be passed when calling `BaseResource.to_response`.
+
+        When serializing related resources, the related items are passed as `data` instead of the parent objects.
+
+        Additional args and kwargs are passed to the `marshmallow` based Schema.
+        """
+        related_resource_cls = self.__class__._related[relationship]  # type: Type[BaseResource]
+        related_schema = related_resource_cls.schema(app=self.request.app, *args, **kwargs)  # type: JSONAPISchema
+        body = related_schema.dump(data, many=many)
+        # TODO: adjust top level links in body['links'] according to json:api examples?
         sparse_body = await self.process_sparse_fields(body, many=many)
         return sparse_body
 
@@ -209,18 +223,12 @@ class BaseResource(metaclass=MetaRegisterResource):
     @classmethod
     async def handle_get_related(cls, request: Request):
         """ Handles related resources requests, such as /articles/1/author. """
-        id_ = request.path_params.get('id')
         relationship = request.path_params.get('relationship')
-        try:
-            if relationship not in cls._related:
-                raise JSONAPIException(status_code=404)
-            resource = cls(request)
-            related_id = await resource.get_related_id(id=id_, relationship=relationship)  # type: Any
-            related_resource = cls._related[relationship](request)
-            response = await related_resource.get(id=related_id)
-        except Exception as e:
-            response = await cls.handle_error(request=request, exc=e)
-        return response
+        if relationship not in cls._related:
+            return await cls.handle_error(request, exc=JSONAPIException(status_code=404))
+        return await cls.handle_request(
+            handler_name='get_related', request=request, relationship=relationship, extract_id=True
+        )
 
     @classmethod
     def register_routes(cls, app: Starlette, base_path: str):
