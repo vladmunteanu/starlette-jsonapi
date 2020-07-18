@@ -54,7 +54,7 @@ class UsersResource(BaseResource):
         if not user:
             raise UserNotFound
 
-        return await self.serialize(data=user)
+        return await self.to_response(await self.serialize(data=user))
 
     async def patch(self, id=None, *args, **kwargs) -> Response:
         if not id:
@@ -77,7 +77,7 @@ class UsersResource(BaseResource):
 
         user.save()
 
-        return await self.serialize(data=user)
+        return await self.to_response(await self.serialize(data=user))
 
     async def delete(self, id=None, *args, **kwargs) -> Response:
         if not id:
@@ -92,7 +92,7 @@ class UsersResource(BaseResource):
 
     async def get_all(self, *args, **kwargs) -> Response:
         users = User.get_items()
-        return await self.serialize(data=users, many=True)
+        return await self.to_response(await self.serialize(data=users, many=True))
 
     async def post(self, *args, **kwargs) -> Response:
         json_body = await self.deserialize_body()
@@ -113,5 +113,4 @@ class UsersResource(BaseResource):
         user.save()
 
         result = await self.serialize(data=user)
-        result.status_code = 201
-        return result
+        return await self.to_response(result, status_code=201)
