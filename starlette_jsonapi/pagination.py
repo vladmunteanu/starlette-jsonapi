@@ -25,8 +25,8 @@ class BasePaginator(object):
         - get_last_link
     It it also HIGHLY recommended that total_result_count() is overridden to optimize database queries
 
-    This class is agnostic about the pagination strategy, can can be effectively
-    subclassed accommodate for any variant.
+    This class is agnostic about the pagination strategy, and can be effectively
+    subclassed to accommodate for any variant.
     """
     page_param_name = None
     size_param_name = None
