@@ -151,7 +151,6 @@ class BaseResource:
             return object_list, None
 
         # apply pagination
-        paginator = self.pagination_class(object_list)
         object_list, pagination_links = paginator.paginate_request(self.request, page, size)
         return object_list, pagination_links
 

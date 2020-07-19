@@ -14,7 +14,7 @@ class PageNumberPaginator(BasePaginator):
 
     def slice_object_list(self, page, size):
         page = page - 1
-        objects = self.object_list[page * size: (page + 1) * size]
+        objects = self.object_list[(page*size):(page+1)*size]
         return objects
 
     def has_next(self):
