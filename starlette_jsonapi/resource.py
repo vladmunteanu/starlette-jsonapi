@@ -47,7 +47,7 @@ class BaseResource:
     id_mask: str = 'str'
 
     # Paginator class, subclass of BasePaginator
-    pagination_class: Type[BasePaginator] = BasePaginator
+    pagination_class: Type[BasePaginator] = None
 
     # Optional, by default this will equal `type_` and will be used to register the Mount name.
     # Impacts the result of `url_path_for`, so it can be used to support multiple resource versions.
@@ -121,7 +121,7 @@ class BaseResource:
         Additional args and kwargs are passed to the `marshmallow` based Schema.
         """
         is_paginated_request = self.request.method == 'GET' and many is True
-        if is_paginated_request:
+        if is_paginated_request and self.pagination_class:
             data, pagination_links = await self.paginate_request(data)
 
         included_relations = await self._prepare_included(data=data, many=many)
@@ -129,8 +129,8 @@ class BaseResource:
         body = schema.dump(data, many=many)
         sparse_body = await self.process_sparse_fields(body, many=many)
 
-        if is_paginated_request:
-            sparse_body['links'].update(pagination_links)
+        if is_paginated_request and self.pagination_class:
+            sparse_body['links'] = pagination_links
         return sparse_body
 
     async def to_response(self, data: dict, *args, **kwargs) -> JSONAPIResponse:
