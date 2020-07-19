@@ -1,5 +1,5 @@
 import logging
-from typing import Type, Any, List, Optional, Union
+from typing import Type, Any, List, Optional, Union, Iterable, Tuple, Dict
 
 from marshmallow.exceptions import ValidationError
 from starlette.applications import Starlette
@@ -11,6 +11,7 @@ from starlette_jsonapi.exceptions import JSONAPIException, HTTPException
 from starlette_jsonapi.fields import JSONAPIRelationship
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
+from starlette_jsonapi.pagination import BasePaginator
 from starlette_jsonapi.utils import (
     parse_included_params,
     parse_sparse_fields_params, filter_sparse_fields,
@@ -44,6 +45,9 @@ class BaseResource:
     # By default `str`, but other options are documented in Starlette:
     # 'str', 'int', 'float', 'uuid', 'path'
     id_mask: str = 'str'
+
+    # Paginator class, subclass of BasePaginator
+    pagination_class: Type[BasePaginator] = BasePaginator
 
     # Optional, by default this will equal `type_` and will be used to register the Mount name.
     # Impacts the result of `url_path_for`, so it can be used to support multiple resource versions.
@@ -111,13 +115,34 @@ class BaseResource:
 
     async def serialize(self, data: Any, many=False) -> JSONAPIResponse:
         """ Serializes data as a JSON:API payload and returns a JSONAPIResponse which can be served to clients. """
+        is_paginated_request = self.request.method == 'GET' and many is True
+        if is_paginated_request:
+            data, pagination_links = await self.paginate_request(data)
+
         included_relations = await self._prepare_included(data=data, many=many)
         schema = self.schema(app=self.request.app, include_data=included_relations)
         body = schema.dump(data, many=many)
         sparse_body = await self.process_sparse_fields(body, many=many)
+
+        if is_paginated_request:
+            sparse_body['links'].update(pagination_links)
+
         return JSONAPIResponse(
             content=sparse_body,
         )
+
+    async def paginate_request(self, object_list: Iterable) -> Tuple[List, Union[Dict, None]]:
+        paginator = self.pagination_class(object_list)
+        page = self.request.query_params.get(paginator.page_param)
+        size = self.request.query_params.get(paginator.size_param)
+        if not any((page, size)):
+            return object_list, None
+
+        # apply pagination
+        paginator = self.pagination_class(object_list)
+        object_list, pagination_links = paginator.paginate_request(self.request, page, size)
+        return object_list, pagination_links
+
 
     @classmethod
     async def handle_error(cls, request: Request, exc: Exception) -> JSONAPIResponse:
