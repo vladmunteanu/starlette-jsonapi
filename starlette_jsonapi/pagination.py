@@ -1,7 +1,7 @@
 import logging
 from collections import namedtuple
 from math import ceil
-from typing import Any, Union, Dict, Tuple, Optional, Sequence
+from typing import Any, Union, Dict, Optional, Sequence
 
 from starlette.requests import Request
 
@@ -33,15 +33,15 @@ class BasePaginator:
     It is also recommended to override validate_page_value to ensure value sanity checks
     for this parameter, and raise PaginationException to properly generate an API error
     """
-    page_param_name: Optional[str] = None
-    size_param_name: Optional[str] = None
-    default_size: Optional[int] = None
-    max_size: Optional[int] = None
+    page_param_name: str = ''
+    size_param_name: str = ''
+    default_size: int = 0
+    max_size: int = 0
 
     def __init__(self, object_list: Sequence):
         self.object_list = object_list
         self.current_page: Union[str, int, None] = None
-        self.page_size: Optional[int] = None
+        self.page_size: int = 0
         self.sliced_object_list: Optional[Sequence] = None
         self.request: Optional[Request] = None
         self._pagination_complete: bool = False

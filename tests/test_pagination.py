@@ -1,11 +1,10 @@
 from asyncio import Future
 from unittest import mock
-from typing import Sequence, Optional
+from typing import Sequence
 
 import pytest
 from marshmallow_jsonapi import fields
 from starlette.applications import Starlette
-from starlette.requests import Request
 from starlette.responses import Response
 from starlette.testclient import TestClient
 
@@ -99,12 +98,8 @@ def pagination_app(app: Starlette):
         max_size = 3
 
         def __init__(self, object_list: Sequence):
-            self.object_list = object_list
-            self.current_page: Optional[int] = None
-            self.page_size: Optional[int] = None
-            self.sliced_object_list: Optional[Sequence] = None
-            self.request: Optional[Request] = None
-            self._pagination_complete: bool = False
+            super(TPaginator, self).__init__(object_list)
+            self.current_page: int = 0
 
         def validate_page_value(self, page) -> int:
             if not page:
