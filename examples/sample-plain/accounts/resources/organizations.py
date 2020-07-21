@@ -73,7 +73,7 @@ class OrganizationsResource(BaseResource):
 
     async def get_all(self, *args, **kwargs) -> Response:
         organizations = Organization.get_items()
-        return await self.to_response(await self.serialize(data=organizations, many=True))
+        return await self.to_response(await self.serialize(data=organizations, many=True, paginate=True))
 
     async def post(self, *args, **kwargs) -> Response:
         json_body = await self.deserialize_body()

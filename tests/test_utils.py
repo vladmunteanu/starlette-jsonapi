@@ -5,6 +5,7 @@ from starlette.testclient import TestClient
 
 from starlette_jsonapi.exceptions import JSONAPIException
 from starlette_jsonapi.responses import JSONAPIResponse
+from starlette_jsonapi.pagination import PaginationException
 from starlette_jsonapi.utils import serialize_error, register_jsonapi_exception_handlers
 
 
@@ -31,6 +32,14 @@ def test_serialize_error():
     assert response.status_code == 400
     assert json.loads(response.body) == {
         'errors': [{'detail': 'foo'}, {'detail': 'bar'}]
+    }
+
+    exc = PaginationException('Test exception')
+    response = serialize_error(exc)
+    assert isinstance(response, JSONAPIResponse)
+    assert response.status_code == 400
+    assert json.loads(response.body) == {
+        'errors': [{'detail': 'Test exception'}]
     }
 
 

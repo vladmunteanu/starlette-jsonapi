@@ -5,9 +5,8 @@ from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import Response
 
-from starlette_jsonapi.exceptions import JSONAPIException
+from starlette_jsonapi.exceptions import JSONAPIException, PaginationException
 from starlette_jsonapi.responses import JSONAPIResponse
-from starlette_jsonapi.pagination import PaginationException
 
 
 def serialize_error(exc: Exception) -> JSONAPIResponse:
