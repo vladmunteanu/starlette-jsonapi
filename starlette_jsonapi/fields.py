@@ -51,13 +51,10 @@ class JSONAPIRelationship(__BaseRelationship):
         return None
 
     def get_related_url(self, obj):
-        related_cls = self.related_resource_class
-        related_route = self.related_route
         related_route_kwargs = self.related_route_kwargs
-        if related_cls:
-            related_route_kwargs = self.related_route_kwargs
+        if self.related_resource_class:
             related_route_kwargs.update(relationship=self.name)
-        return self.get_url(obj, related_route, **related_route_kwargs)
+        return self.get_url(obj, self.related_route, **related_route_kwargs)
 
     def get_self_url(self, obj):
         return self.get_url(obj, self.self_route, **self.self_route_kwargs)
