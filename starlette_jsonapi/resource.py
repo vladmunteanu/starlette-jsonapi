@@ -70,10 +70,8 @@ class BaseResource(metaclass=RegisteredResourceMeta):
     # By default, subclasses are registered.
     register_resource = False
 
-    # This will be populated when routes are registered.
-    # We only need this because starlette doesn't yet allow us to use partials
-    # or to pass something to the handler when setting up a route,
-    # and we want to return 404 errors if the related resource doesn't actually exist.
+    # This will be populated when routes are registered and we detect related resources.
+    # Used in `serialize_related`.
     _related: Dict[str, Type['BaseResource']]
 
     def __init__(self, request: Request, request_context: dict = None, *args, **kwargs) -> None:
