@@ -627,7 +627,7 @@ def test_get_related_resource(relationship_links_app: Starlette):
                 'description': 'related-item-description',
             },
             'links': {
-                'self': '/test-resource/1/rel',
+                'self': '/test-resource/1/rel/related-item-id',
             }
         },
         'links': {
@@ -669,7 +669,7 @@ def test_get_related_resource_many(relationship_links_app: Starlette):
                     'description': 'related-item-description',
                 },
                 'links': {
-                    'self': '/test-resource/1/rel',
+                    'self': '/test-resource/1/rel/related-item-id',
                 }
             },
             {
@@ -679,7 +679,7 @@ def test_get_related_resource_many(relationship_links_app: Starlette):
                     'description': 'related-item-description-2',
                 },
                 'links': {
-                    'self': '/test-resource/1/rel',
+                    'self': '/test-resource/1/rel/related-item-id-2',
                 }
             }
         ],

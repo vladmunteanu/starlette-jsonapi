@@ -94,7 +94,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
     async def post(self, *args, **kwargs) -> Response:
         raise JSONAPIException(status_code=405)
 
-    async def get_related(self, id: Any, relationship: str, *args, **kwargs) -> Response:
+    async def get_related(self, id: Any, relationship: str, related_id: Any = None, *args, **kwargs) -> Response:
         """
         Subclasses should implement this if they specify relationships
         and want to support fetching related resources.
@@ -157,10 +157,11 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         related_resource_cls = self.__class__._related[relationship]  # type: Type[BaseResource]
         related_schema = related_resource_cls.schema(
             app=self.request.app, *args, **kwargs,
-            self_route=f'{self.mount.name}:{relationship}',
+            self_route=f'{self.mount.name}:{relationship}-id',
             self_route_kwargs={
                 'id': id,
                 'relationship': relationship,
+                'related_id': '<id>',
             },
             self_route_many=f'{self.mount.name}:{relationship}',
             self_route_many_kwargs={
@@ -236,10 +237,12 @@ class BaseResource(metaclass=RegisteredResourceMeta):
     async def handle_get_related(cls, request: Request):
         """ Handles related resources requests, such as /articles/1/author. """
         relationship = request.path_params.get('relationship')
+        related_id = request.path_params.get('related_id')
         if relationship not in cls._related:
             return await cls.handle_error(request, exc=JSONAPIException(status_code=404))
         return await cls.handle_request(
-            handler_name='get_related', request=request, relationship=relationship, extract_id=True
+            handler_name='get_related', request=request, relationship=relationship, extract_id=True,
+            related_id=related_id,
         )
 
     @classmethod
@@ -253,8 +256,19 @@ class BaseResource(metaclass=RegisteredResourceMeta):
             if isinstance(field, JSONAPIRelationship):
                 if field.related_resource:
                     cls._related[fname] = field.related_resource_class
-        # attach related routes, example: /articles/1/author
+
+        # attach secondary related routes, example: /articles/1/author/1
         routes = [
+            Route(
+                '/{{id:{}}}/{{relationship:str}}/{{related_id:{}}}'.format(cls.id_mask, rel_class.id_mask),
+                cls.handle_get_related,
+                methods=['GET'],
+                name=f'{rel_name}-id',
+            )
+            for rel_name, rel_class in cls._related.items()
+        ]
+        # attach related routes, example: /articles/1/author
+        routes += [
             Route(
                 '/{{id:{}}}/{{relationship:str}}'.format(cls.id_mask),
                 cls.handle_get_related,
@@ -263,6 +277,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
             )
             for rel in cls._related
         ]
+
         # attach primary routes, example: /articles/ and /articles/1
         routes += [
             Route(

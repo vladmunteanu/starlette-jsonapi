@@ -81,12 +81,11 @@ class JSONAPISchema(__Schema):
         return None
 
     def get_top_level_links(self, data, many):
-        """
-        Overriding base implementation because we need to support kwargs
-        on `many` URLs when serialization is performed from a related resource.
-        """
-        if many and self.opts.self_url_many and self.self_route_many_kwargs:
-            self_link = self.generate_url(self.opts.self_url_many, **self.self_route_many_kwargs)
+        """ Overriding base implementation to support serialization as a related resource. """
+        self_link = None
+        if self.self_route_many:
+            self_link = self.generate_url(self.self_route_many, **self.self_route_many_kwargs)
+        if self_link:
             return {"self": self_link}
         return super().get_top_level_links(data, many)
 
