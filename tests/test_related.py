@@ -687,3 +687,43 @@ def test_get_related_resource_many(relationship_links_app: Starlette):
             'self': '/test-resource/1/rel',
         }
     }
+
+
+def test_get_related_resource_by_id(relationship_links_app: Starlette):
+    from starlette_jsonapi import meta
+
+    async def get_related(self, id, relationship, related_id, *args, **kwargs):
+        objs = {
+            'related-item-id': dict(id='related-item-id', description='related-item-description'),
+            'related-item-id-2': dict(id='related-item-id-2', description='related-item-description-2'),
+        }
+        return await self.to_response(
+            await self.serialize_related(
+                objs[related_id],
+                id=id,
+                relationship=relationship,
+            )
+        )
+
+    TResource = meta.registered_resources.get('TResource')
+    assert TResource is not None
+    setattr(TResource, 'get_related', get_related)
+
+    test_client = TestClient(relationship_links_app)
+    rv = test_client.get('/test-resource/1/rel/related-item-id-2')
+    assert rv.status_code == 200
+    assert rv.json() == {
+        'data': {
+            'id': 'related-item-id-2',
+            'type': 'test-related-resource',
+            'attributes': {
+                'description': 'related-item-description-2',
+            },
+            'links': {
+                'self': '/test-resource/1/rel/related-item-id-2',
+            }
+        },
+        'links': {
+            'self': '/test-resource/1/rel',
+        }
+    }
