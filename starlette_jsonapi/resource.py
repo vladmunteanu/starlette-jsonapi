@@ -151,7 +151,6 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         which can be passed when calling `BaseResource.to_response`.
 
         When serializing related resources, the related items are passed as `data` instead of the parent objects.
-        The parent resource id is passed as `id`.
 
         Additional args and kwargs are passed to the `marshmallow` based Schema.
         """
@@ -168,9 +167,10 @@ class BaseResource(metaclass=RegisteredResourceMeta):
             related_route_kwargs.update(related_id='<id>')
 
         related_schema = related_resource_cls.schema(
-            app=self.request.app, *args, **kwargs,
+            app=self.request.app,
             self_related_route=related_route,
             self_related_route_kwargs=related_route_kwargs,
+            *args, **kwargs,
         )  # type: JSONAPISchema
         body = related_schema.dump(data, many=many)
         sparse_body = await self.process_sparse_fields(body, many=many)
