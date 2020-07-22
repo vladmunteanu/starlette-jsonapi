@@ -106,7 +106,8 @@ so the `BaseResource` comes with 5 methods that you can override:
 All methods return 405 Method Not Allowed by default.
 You can also customize `allowed_methods` to a subset of the above HTTP methods.
 
-Additionally, the `prepare_relations` method is available for enabling inclusion of related resources.
+Additionally, the `prepare_relations` method is available for enabling inclusion of related
+resources when the `include` query parameter is specified.
 Since the json:api specification does not enforce this, the default implementation will skip inclusion
 in order to avoid data leaks.
 
@@ -166,6 +167,10 @@ class ExampleResource(BaseResource):
 
         return await self.to_response(await self.serialize(example), status_code=201)
 ```
+
+Also optional, you can support fetching related data for requests like `/articles/1/author`,
+by implementing `get_related`, then calling `serialize_related` with the related data.
+Check [sample-plain](examples/sample-plain) for an implementation example.
 
 ### Defining a relationship resource
 You can choose to define a relationship resource by subclassing `starlette_jsonapi.resource.BaseRelationshipResource`.
