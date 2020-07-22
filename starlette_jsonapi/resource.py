@@ -144,19 +144,31 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         sparse_body = await self.process_sparse_fields(body, many=many)
         return sparse_body
 
-    async def serialize_related(self, data: Any, relationship: str, many=False, *args, **kwargs) -> dict:
+    async def serialize_related(self, data: Any, id: Any, relationship: str, many=False, *args, **kwargs) -> dict:
         """
         Serializes related data as a JSON:API payload and returns a `dict`
         which can be passed when calling `BaseResource.to_response`.
 
         When serializing related resources, the related items are passed as `data` instead of the parent objects.
+        The parent resource id is passed as `id`.
 
         Additional args and kwargs are passed to the `marshmallow` based Schema.
         """
         related_resource_cls = self.__class__._related[relationship]  # type: Type[BaseResource]
-        related_schema = related_resource_cls.schema(app=self.request.app, *args, **kwargs)  # type: JSONAPISchema
+        related_schema = related_resource_cls.schema(
+            app=self.request.app, *args, **kwargs,
+            self_route=f'{self.mount.name}:{relationship}',
+            self_route_kwargs={
+                'id': id,
+                'relationship': relationship,
+            },
+            self_route_many=f'{self.mount.name}:{relationship}',
+            self_route_many_kwargs={
+                'id': id,
+                'relationship': relationship,
+            },
+        )  # type: JSONAPISchema
         body = related_schema.dump(data, many=many)
-        # TODO: adjust top level links in body['links'] according to json:api examples?
         sparse_body = await self.process_sparse_fields(body, many=many)
         return sparse_body
 

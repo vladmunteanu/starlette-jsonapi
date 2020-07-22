@@ -607,6 +607,7 @@ def test_get_related_resource(relationship_links_app: Starlette):
             # we serialize the related object directly
             await self.serialize_related(
                 dict(id='related-item-id', description='related-item-description'),
+                id=id,
                 relationship=relationship,
             )
         )
@@ -626,11 +627,11 @@ def test_get_related_resource(relationship_links_app: Starlette):
                 'description': 'related-item-description',
             },
             'links': {
-                'self': '/test-related-resource/related-item-id',
+                'self': '/test-resource/1/rel',
             }
         },
         'links': {
-            'self': '/test-related-resource/related-item-id',
+            'self': '/test-resource/1/rel',
         }
     }
 
@@ -646,6 +647,7 @@ def test_get_related_resource_many(relationship_links_app: Starlette):
                     dict(id='related-item-id', description='related-item-description'),
                     dict(id='related-item-id-2', description='related-item-description-2'),
                 ],
+                id=id,
                 relationship=relationship,
                 many=True,
             )
@@ -667,7 +669,7 @@ def test_get_related_resource_many(relationship_links_app: Starlette):
                     'description': 'related-item-description',
                 },
                 'links': {
-                    'self': '/test-related-resource/related-item-id',
+                    'self': '/test-resource/1/rel',
                 }
             },
             {
@@ -677,11 +679,11 @@ def test_get_related_resource_many(relationship_links_app: Starlette):
                     'description': 'related-item-description-2',
                 },
                 'links': {
-                    'self': '/test-related-resource/related-item-id-2',
+                    'self': '/test-resource/1/rel',
                 }
             }
         ],
         'links': {
-            'self': '/test-related-resource/',
+            'self': '/test-resource/1/rel',
         }
     }

@@ -59,12 +59,36 @@ class JSONAPISchema(__Schema):
 
     def __init__(self, *args, **kwargs):
         self.app = kwargs.pop('app', None)  # type: Starlette
+        # allow overriding self_route, self_route_kwargs and self_route_many
+        # which are defined on the Meta class, accessible here as `self.opts`
+        self.self_route = kwargs.pop('self_route', None)
+        self.self_route_kwargs = kwargs.pop('self_route_kwargs', None)
+        self.self_route_many = kwargs.pop('self_route_many', None)
+        self.self_route_many_kwargs = kwargs.pop('self_route_many_kwargs', None)
+
         super().__init__(*args, **kwargs)
+        # override routes
+        if self.self_route:
+            self.opts.self_url = self.self_route
+        if self.self_route_kwargs:
+            self.opts.self_url_kwargs = self.self_route_kwargs
+        if self.self_route_many:
+            self.opts.self_url_many = self.self_route_many
 
     def generate_url(self, link, **kwargs):
         if self.app and isinstance(self.app, Starlette) and link:
             return self.app.url_path_for(link, **kwargs)
         return None
+
+    def get_top_level_links(self, data, many):
+        """
+        Overriding base implementation because we need to support kwargs
+        on `many` URLs when serialization is performed from a related resource.
+        """
+        if many and self.opts.self_url_many and self.self_route_many_kwargs:
+            self_link = self.generate_url(self.opts.self_url_many, **self.self_route_many_kwargs)
+            return {"self": self_link}
+        return super().get_top_level_links(data, many)
 
     def get_resource_links(self, item):
         """ Override the marshmallow-jsonapi implementation to check for None links. """
