@@ -3,6 +3,7 @@ from typing import Dict
 from marshmallow import EXCLUDE
 from marshmallow.fields import Field
 from marshmallow_jsonapi import Schema as __Schema, SchemaOpts as __SchemaOpts
+from marshmallow_jsonapi.utils import resolve_params
 from starlette.applications import Starlette
 
 
@@ -59,21 +60,11 @@ class JSONAPISchema(__Schema):
 
     def __init__(self, *args, **kwargs):
         self.app = kwargs.pop('app', None)  # type: Starlette
-        # allow overriding self_route, self_route_kwargs and self_route_many
-        # which are defined on the Meta class, accessible here as `self.opts`
-        self.self_route = kwargs.pop('self_route', None)
-        self.self_route_kwargs = kwargs.pop('self_route_kwargs', None)
-        self.self_route_many = kwargs.pop('self_route_many', None)
-        self.self_route_many_kwargs = kwargs.pop('self_route_many_kwargs', None)
+        # allow changing links through self_related_route, self_related_route_kwargs
+        self.self_related_route = kwargs.pop('self_related_route', None)
+        self.self_related_route_kwargs = kwargs.pop('self_related_route_kwargs', None)
 
         super().__init__(*args, **kwargs)
-        # override routes
-        if self.self_route:
-            self.opts.self_url = self.self_route
-        if self.self_route_kwargs:
-            self.opts.self_url_kwargs = self.self_route_kwargs
-        if self.self_route_many:
-            self.opts.self_url_many = self.self_route_many
 
     def generate_url(self, link, **kwargs):
         if self.app and isinstance(self.app, Starlette) and link:
@@ -83,8 +74,12 @@ class JSONAPISchema(__Schema):
     def get_top_level_links(self, data, many):
         """ Overriding base implementation to support serialization as a related resource. """
         self_link = None
-        if self.self_route_many:
-            self_link = self.generate_url(self.self_route_many, **self.self_route_many_kwargs)
+        if self.self_related_route:
+            if many:
+                kwargs = self.self_related_route_kwargs
+            else:
+                kwargs = resolve_params(data, self.self_related_route_kwargs)
+            self_link = self.generate_url(self.self_related_route, **kwargs)
         if self_link:
             return {"self": self_link}
         return super().get_top_level_links(data, many)

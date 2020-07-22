@@ -76,8 +76,9 @@ class BaseResource(metaclass=RegisteredResourceMeta):
     # and we want to return 404 errors if the related resource doesn't actually exist.
     _related: Dict[str, Type['BaseResource']]
 
-    def __init__(self, request: Request, *args, **kwargs) -> None:
+    def __init__(self, request: Request, request_context: dict = None, *args, **kwargs) -> None:
         self.request = request
+        self.request_context = request_context or {}
 
     async def get(self, id=None, *args, **kwargs) -> Response:
         raise JSONAPIException(status_code=405)
@@ -144,7 +145,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         sparse_body = await self.process_sparse_fields(body, many=many)
         return sparse_body
 
-    async def serialize_related(self, data: Any, id: Any, relationship: str, many=False, *args, **kwargs) -> dict:
+    async def serialize_related(self, data: Any, many=False, *args, **kwargs) -> dict:
         """
         Serializes related data as a JSON:API payload and returns a `dict`
         which can be passed when calling `BaseResource.to_response`.
@@ -154,20 +155,22 @@ class BaseResource(metaclass=RegisteredResourceMeta):
 
         Additional args and kwargs are passed to the `marshmallow` based Schema.
         """
+        relationship = self.request_context['relationship']
+        parent_id = self.request_context['id']
         related_resource_cls = self.__class__._related[relationship]  # type: Type[BaseResource]
+        related_route = f'{self.mount.name}:{relationship}'
+        related_route_kwargs = {
+            'id': parent_id,
+            'relationship': relationship,
+        }
+        if self.request_context.get('related_id'):
+            related_route += '-id'
+            related_route_kwargs.update(related_id='<id>')
+
         related_schema = related_resource_cls.schema(
             app=self.request.app, *args, **kwargs,
-            self_route=f'{self.mount.name}:{relationship}-id',
-            self_route_kwargs={
-                'id': id,
-                'relationship': relationship,
-                'related_id': '<id>',
-            },
-            self_route_many=f'{self.mount.name}:{relationship}',
-            self_route_many_kwargs={
-                'id': id,
-                'relationship': relationship,
-            },
+            self_related_route=related_route,
+            self_related_route_kwargs=related_route_kwargs,
         )  # type: JSONAPISchema
         body = related_schema.dump(data, many=many)
         sparse_body = await self.process_sparse_fields(body, many=many)
@@ -191,7 +194,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
 
     @classmethod
     async def handle_request(
-            cls, handler_name: str, request: Request,
+            cls, handler_name: str, request: Request, request_context: dict = None,
             extract_id: bool = False, *args, **kwargs
     ) -> Response:
         """
@@ -199,14 +202,16 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         Additional args and kwargs are passed to the handler method,
         which is usually one of: `get`, `patch`, `delete`, `get_all` or `post`.
         """
+        request_context = request_context or {}
         if extract_id:
             id_ = request.path_params.get('id')
             kwargs.update({'id': id_})
+            request_context.update({'id': id_})
 
         try:
             if request.method not in cls.allowed_methods:
                 raise JSONAPIException(status_code=405)
-            resource = cls(request)
+            resource = cls(request, request_context=request_context)
             handler = getattr(resource, handler_name, None)
             response = await handler(*args, **kwargs)  # type: Response
         except Exception as e:
@@ -238,11 +243,14 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         """ Handles related resources requests, such as /articles/1/author. """
         relationship = request.path_params.get('relationship')
         related_id = request.path_params.get('related_id')
+        request_context = {'relationship': relationship, 'related_id': related_id}
         if relationship not in cls._related:
             return await cls.handle_error(request, exc=JSONAPIException(status_code=404))
         return await cls.handle_request(
-            handler_name='get_related', request=request, relationship=relationship, extract_id=True,
-            related_id=related_id,
+            handler_name='get_related', request=request,
+            relationship=relationship, related_id=related_id,
+            request_context=request_context,
+            extract_id=True,
         )
 
     @classmethod
