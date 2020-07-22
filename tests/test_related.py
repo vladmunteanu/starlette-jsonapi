@@ -721,3 +721,12 @@ def test_get_related_resource_by_id(relationship_links_app: Starlette):
             'self': '/test-resource/1/rel/related-item-id-2',
         }
     }
+
+
+def test_related_routes(relationship_links_app: Starlette):
+    assert relationship_links_app.url_path_for(
+        'test-resource:rel', id='1', relationship='rel'
+    ) == '/test-resource/1/rel'
+    assert relationship_links_app.url_path_for(
+        'test-resource:rel-id', id='1', relationship='rel', related_id='2'
+    ) == '/test-resource/1/rel/2'
