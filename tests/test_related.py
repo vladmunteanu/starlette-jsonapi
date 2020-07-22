@@ -592,11 +592,6 @@ def test_related_resource_relationship_not_found(relationship_links_app: Starlet
     test_client = TestClient(relationship_links_app)
     rv = test_client.get('/test-resource/1/non-existing-rel')
     assert rv.status_code == 404
-    assert rv.json() == {
-        'errors': [
-            {'detail': 'Not Found'}
-        ]
-    }
 
 
 def test_get_related_resource(relationship_links_app: Starlette):
@@ -725,8 +720,8 @@ def test_get_related_resource_by_id(relationship_links_app: Starlette):
 
 def test_related_routes(relationship_links_app: Starlette):
     assert relationship_links_app.url_path_for(
-        'test-resource:rel', id='1', relationship='rel'
+        'test-resource:rel', id='1'
     ) == '/test-resource/1/rel'
     assert relationship_links_app.url_path_for(
-        'test-resource:rel-id', id='1', relationship='rel', related_id='2'
+        'test-resource:rel-id', id='1', related_id='2'
     ) == '/test-resource/1/rel/2'

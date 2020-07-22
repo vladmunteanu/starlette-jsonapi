@@ -160,7 +160,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         related_route = f'{self.mount.name}:{relationship}'
         related_route_kwargs = {
             'id': parent_id,
-            'relationship': relationship,
+            # 'relationship': relationship,
         }
         if self.request_context.get('related_id'):
             related_route += '-id'
@@ -239,13 +239,10 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         return await cls.handle_request(handler_name='post', request=request)
 
     @classmethod
-    async def handle_get_related(cls, request: Request):
+    async def handle_get_related(cls, request: Request, relationship: str = None):
         """ Handles related resources requests, such as /articles/1/author. """
-        relationship = request.path_params.get('relationship')
         related_id = request.path_params.get('related_id')
         request_context = {'relationship': relationship, 'related_id': related_id}
-        if relationship not in cls._related:
-            return await cls.handle_error(request, exc=JSONAPIException(status_code=404))
         return await cls.handle_request(
             handler_name='get_related', request=request,
             relationship=relationship, related_id=related_id,
@@ -268,8 +265,8 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         # attach secondary related routes, example: /articles/1/author/1
         routes = [
             Route(
-                '/{{id:{}}}/{{relationship:str}}/{{related_id:{}}}'.format(cls.id_mask, rel_class.id_mask),
-                cls.handle_get_related,
+                '/{{id:{}}}/{}/{{related_id:{}}}'.format(cls.id_mask, rel_name, rel_class.id_mask),
+                _partial(relationship=rel_name)(cls.handle_get_related),
                 methods=['GET'],
                 name=f'{rel_name}-id',
             )
@@ -278,12 +275,12 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         # attach related routes, example: /articles/1/author
         routes += [
             Route(
-                '/{{id:{}}}/{{relationship:str}}'.format(cls.id_mask),
-                cls.handle_get_related,
+                '/{{id:{}}}/{}'.format(cls.id_mask, rel_name),
+                _partial(relationship=rel_name)(cls.handle_get_related),
                 methods=['GET'],
-                name=rel,
+                name=rel_name,
             )
-            for rel in cls._related
+            for rel_name in cls._related
         ]
 
         # attach primary routes, example: /articles/ and /articles/1
@@ -529,3 +526,15 @@ class BaseRelationshipResource:
                 methods=['GET', 'POST', 'PATCH', 'DELETE'],
             )
         )
+
+
+def _partial(*args, **kwargs):
+    """
+    This is a temporary partial, since we cannot use functools.partial with Starlette due to asyncio bugs.
+    https://github.com/encode/starlette/pull/984
+    """
+    def outer(f):
+        async def inner(request: Request):
+            return await f(request, *args, **kwargs)
+        return inner
+    return outer
