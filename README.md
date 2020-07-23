@@ -211,9 +211,9 @@ class EmployeeSchema(JSONAPISchema):
         type_='employees',
         schema='EmployeeSchema',
         include_resource_linkage=True,
-        self_route='employees:manager',
+        self_route='employees:relationships-manager',
         self_route_kwargs={'parent_id': '<id>'},
-        related_route='employees:get',
+        related_route='employees:manager',
         related_route_kwargs={'id': '<id>'},
     )
 
