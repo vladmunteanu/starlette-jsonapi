@@ -123,6 +123,6 @@ class UsersResource(BaseResource):
         if not user:
             raise UserNotFound
 
-        if relationship == 'organization':
+        if relationship == 'organization' and related_id is None:
             return await self.to_response(await self.serialize_related(user.organization))
         raise HTTPException(status_code=404)

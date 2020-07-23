@@ -130,7 +130,12 @@ class TeamsResource(BaseResource):
         if not team:
             raise TeamNotFound
         if relationship == 'users':
-            return await self.to_response(await self.serialize_related(team.users, many=True))
+            if not related_id:
+                return await self.to_response(await self.serialize_related(team.users, many=True))
+            else:
+                filtered_users = list(filter(lambda user: user.id == related_id, team.users))
+                if len(filtered_users) == 1:
+                    return await self.to_response(await self.serialize_related(filtered_users[0]))
         raise HTTPException(status_code=404)
 
 
