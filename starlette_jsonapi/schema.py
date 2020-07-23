@@ -68,7 +68,8 @@ class JSONAPISchema(__Schema):
 
     def generate_url(self, link, **kwargs):
         if self.app and isinstance(self.app, Starlette) and link:
-            return self.app.url_path_for(link, **kwargs)
+            prefix = getattr(self.app, "url_prefix", "")
+            return f"{prefix}{self.app.url_path_for(link, **kwargs)}"
         return None
 
     def get_top_level_links(self, data, many):
