@@ -2,6 +2,8 @@ from marshmallow_jsonapi.fields import Relationship as __BaseRelationship
 from marshmallow_jsonapi.utils import resolve_params
 from starlette.applications import Starlette
 
+from starlette_jsonapi.meta import registered_resources
+
 
 class JSONAPIRelationship(__BaseRelationship):
     """
@@ -13,6 +15,7 @@ class JSONAPIRelationship(__BaseRelationship):
     def __init__(
         self,
         id_attribute=None,
+        related_resource=None,
         related_route=None,
         related_route_kwargs=None,
         *,
@@ -21,6 +24,7 @@ class JSONAPIRelationship(__BaseRelationship):
         **kwargs
     ):
         self.id_attribute = id_attribute
+        self.related_resource = related_resource
         self.related_route = related_route
         self.related_route_kwargs = related_route_kwargs or {}
         self.self_route = self_route
@@ -51,3 +55,10 @@ class JSONAPIRelationship(__BaseRelationship):
 
     def get_self_url(self, obj):
         return self.get_url(obj, self.self_route, **self.self_route_kwargs)
+
+    @property
+    def related_resource_class(self):
+        related_resource = self.related_resource
+        if isinstance(self.related_resource, str):
+            related_resource = registered_resources.get(self.related_resource)
+        return related_resource

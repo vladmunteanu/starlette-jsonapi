@@ -1,7 +1,8 @@
 import logging
-from typing import List
+from typing import List, Any
 
 from marshmallow_jsonapi import fields
+from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
 from starlette_jsonapi.fields import JSONAPIRelationship
@@ -25,6 +26,11 @@ class TeamSchema(JSONAPISchema):
         include_resource_linkage=True,
         many=True,
         required=True,
+        self_route='teams:relationships-users',
+        self_route_kwargs={'parent_id': '<id>'},
+        related_resource='UsersResource',
+        related_route='teams:users',
+        related_route_kwargs={'id': '<id>'},
     )
 
     class Meta:
@@ -118,6 +124,14 @@ class TeamsResource(BaseResource):
 
         result = await self.serialize(data=team)
         return await self.to_response(result, status_code=201)
+
+    async def get_related(self, id: Any, relationship: str, related_id: Any = None, *args, **kwargs) -> Response:
+        team = Team.get_item(id)
+        if not team:
+            raise TeamNotFound
+        if relationship == 'users':
+            return await self.to_response(await self.serialize_related(team.users, many=True))
+        raise HTTPException(status_code=404)
 
 
 class TeamUsersResource(BaseRelationshipResource):
