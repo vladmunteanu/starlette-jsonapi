@@ -5,6 +5,7 @@ from marshmallow.fields import Field
 from marshmallow_jsonapi import Schema as __Schema, SchemaOpts as __SchemaOpts
 from marshmallow_jsonapi.utils import resolve_params
 from starlette.applications import Starlette
+
 from starlette_jsonapi.utils import prefix_url_path
 
 
