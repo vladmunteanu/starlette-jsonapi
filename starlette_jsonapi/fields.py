@@ -3,6 +3,7 @@ from marshmallow_jsonapi.utils import resolve_params
 from starlette.applications import Starlette
 
 from starlette_jsonapi.meta import registered_resources
+from starlette_jsonapi.utils import prefix_url_path
 
 
 class JSONAPIRelationship(__BaseRelationship):
@@ -47,7 +48,7 @@ class JSONAPIRelationship(__BaseRelationship):
     def get_url(self, obj, route_name, **kwargs):
         if route_name and self.parent and self.parent.app and isinstance(self.parent.app, Starlette):
             kwargs = resolve_params(obj, kwargs, default=self.default)
-            return self.parent.app.url_path_for(route_name, **kwargs)
+            return prefix_url_path(self.parent.app, route_name, **kwargs)
         return None
 
     def get_related_url(self, obj):

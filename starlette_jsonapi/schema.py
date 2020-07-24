@@ -5,6 +5,7 @@ from marshmallow.fields import Field
 from marshmallow_jsonapi import Schema as __Schema, SchemaOpts as __SchemaOpts
 from marshmallow_jsonapi.utils import resolve_params
 from starlette.applications import Starlette
+from starlette_jsonapi.utils import prefix_url_path
 
 
 class BaseSchemaOpts(__SchemaOpts):
@@ -68,8 +69,7 @@ class JSONAPISchema(__Schema):
 
     def generate_url(self, link, **kwargs):
         if self.app and isinstance(self.app, Starlette) and link:
-            prefix = getattr(self.app, "url_prefix", "")
-            return f"{prefix}{self.app.url_path_for(link, **kwargs)}"
+            return prefix_url_path(self.app, link, **kwargs)
         return None
 
     def get_top_level_links(self, data, many):
