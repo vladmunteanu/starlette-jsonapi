@@ -283,6 +283,33 @@ While handling a request inside a resource, you can use `self.request` to access
 Although directly accessible from `self.request`, you should probably use `self.deserialize_body`
 to raise any validation errors as 400 HTTP responses, while benefiting from a cleaner payload.
 
+### Links
+
+Links are relative by default. You can add a static prefix to the generated links url by adding an `url_prefix` attribute to your app instance.
+
+Setting up the app with
+```python
+app = Starlette()
+app.url_prefix = 'https://example.com'
+```
+Will produce the following links
+```
+{
+    'data': {
+        'id': 'foo',
+        'type': 'test-resource',
+        'attributes': {
+            'name': 'foo-name',
+        },
+        'links': {
+            'self': 'https://example.com/test-resource/foo',
+        },
+    },
+    'links': {
+        'self': 'https://example.com/test-resource/foo',
+    },
+}
+```
 ## Contributing
 This project is in its early days, so **any** help is appreciated.
 

@@ -112,3 +112,8 @@ def filter_sparse_fields(item: dict, sparse_fields) -> dict:
         else:
             del item['relationships']
     return item
+
+
+def prefix_url_path(app: Starlette, path: str, **kwargs):
+    prefix = getattr(app, 'url_prefix', '')
+    return f'{prefix}{app.url_path_for(path, **kwargs)}'
