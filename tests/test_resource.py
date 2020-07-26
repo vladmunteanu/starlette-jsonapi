@@ -1,4 +1,5 @@
 import logging
+import uuid
 from typing import Any, List
 
 import pytest
@@ -726,4 +727,54 @@ def test_sparse_fields_many(included_app: Starlette):
             },
 
         ]
+    }
+
+
+def test_client_generated_ids(app: Starlette):
+    class TSchema(JSONAPISchema):
+        id = fields.Str()
+        name = fields.Str()
+
+        class Meta:
+            type_ = 'test-resource'
+
+    class TResource(BaseResource):
+        type_ = 'test-resource'
+        schema = TSchema
+        id_mask = 'uuid'
+
+        async def post(self, *args, **kwargs) -> Response:
+            body = await self.deserialize_body()
+            return await self.to_response(
+                await self.serialize(dict(id=body.get('id'), name=body.get('name'))),
+                status_code=201
+            )
+
+    TResource.register_routes(app, '/')
+
+    test_id = str(uuid.uuid4())
+
+    test_client = TestClient(app)
+    rv = test_client.post(
+        '/test-resource/',
+        headers={'Content-Type': 'application/vnd.api+json'},
+        json={
+            'data': {
+                'id': test_id,
+                'type': 'test-resource',
+                'attributes': {
+                    'name': 'foo'
+                }
+            }
+        }
+    )
+    assert rv.status_code == 201
+    assert rv.json() == {
+        'data': {
+            'id': test_id,
+            'type': 'test-resource',
+            'attributes': {
+                'name': 'foo',
+            }
+        }
     }
