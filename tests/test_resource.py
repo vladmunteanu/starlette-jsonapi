@@ -747,7 +747,7 @@ def test_client_generated_ids(app: Starlette):
             body = await self.deserialize_body()
             return await self.to_response(
                 await self.serialize(dict(id=body.get('id'), name=body.get('name'))),
-                status_code=201
+                status_code=201,
             )
 
     TResource.register_routes(app, '/')
@@ -763,7 +763,7 @@ def test_client_generated_ids(app: Starlette):
                 'id': test_id,
                 'type': 'test-resource',
                 'attributes': {
-                    'name': 'foo'
+                    'name': 'foo',
                 }
             }
         }
