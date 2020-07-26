@@ -23,6 +23,7 @@ Since this project is under development, please pin your dependencies to avoid p
 - exception handlers to serialize as json:api responses
 - relationship resources
 - sparse fields
+- support for client generated IDS
 
 ### Todo:
 - [pagination helpers](https://jsonapi.org/format/#fetching-pagination)
@@ -33,7 +34,6 @@ Since this project is under development, please pin your dependencies to avoid p
 - [support jsonapi objects](https://jsonapi.org/format/#document-jsonapi-object)
 - [enforce member name validation](https://jsonapi.org/format/#document-member-names)
 - [optionally enforce query name validation](https://jsonapi.org/format/#query-parameters)
-- [support client generated ids](https://jsonapi.org/format/#crud-creating-client-ids)
 
 ## Documentation
 You should take a look at the [examples](examples) directory for implementations.
@@ -233,7 +233,7 @@ EmployeeResource.register_routes(app=app, base_path='/')
 EmployeeManagerResource.register_routes(app=app)
 ```
 
-#### Registering resource paths
+### Registering resource paths
 To register a defined resource class, we need to add the appropriate paths to the Starlette app.
 Considering the ExampleResource implementation above, it's as simple as:
 ```python
@@ -276,10 +276,10 @@ Which will cause the routes to be registered:
 - DELETE `/api/v2/examples/{id:str}`
 
 
-#### Accessing the request
+### Accessing the request
 While handling a request inside a resource, you can use `self.request` to access the Starlette Request object.
 
-#### Accessing the request body
+### Accessing the request body
 Although directly accessible from `self.request`, you should probably use `self.deserialize_body`
 to raise any validation errors as 400 HTTP responses, while benefiting from a cleaner payload.
 
@@ -289,6 +289,8 @@ Links are relative by default. You can add a static prefix to the generated link
 
 Setting up the app with
 ```python
+from starlette.applications import Starlette
+
 app = Starlette()
 app.url_prefix = 'https://example.com'
 ```
@@ -310,6 +312,22 @@ Will produce the following links
     },
 }
 ```
+
+### Client generated IDs
+The JSON:API spec mentions:
+> A server MAY accept a client-generated ID along with a request to create a resource. 
+
+To enable client generated IDS, specify the Schema's `id` field without the usual `dump_only`
+attribute that has been presented in this documentation.
+Doing this will make `marshmallow` read the `id` field when `deserialize_body` is called.
+
+Note: Validation of the client generated ID is not provided by this framework, but the specification
+mentions:
+> An ID MUST be specified with an id key, the value of which MUST be a universally unique identifier.
+
+If you intend to use `uuid` IDs, set `id_mask = 'uuid'` when defining the Resource class, and some validation
+will be handled by Starlette. Requests with malformed IDS will likely result in 404 errors. 
+
 ## Contributing
 This project is in its early days, so **any** help is appreciated.
 
