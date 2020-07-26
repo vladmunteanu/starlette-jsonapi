@@ -441,11 +441,15 @@ class BaseRelationshipResource:
         body = relationship.serialize(self.relationship_name, data)
         return body
 
-    async def to_response(self, data: dict, *args, **kwargs) -> JSONAPIResponse:
+    async def to_response(self, data: dict, meta: dict = None, *args, **kwargs) -> JSONAPIResponse:
         """
         Wraps `data` in a JSONAPIResponse object and returns it.
+        If `meta` is specified, it will be included as the top level `meta` object in the json:api response.
         Additional args and kwargs are passed to the `starlette` based Response.
         """
+        if meta:
+            data = data.copy()
+            data.update(meta=meta)
         return JSONAPIResponse(
             content=data,
             *args, **kwargs,
