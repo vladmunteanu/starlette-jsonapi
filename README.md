@@ -23,7 +23,7 @@ Since this project is under development, please pin your dependencies to avoid p
 - exception handlers to serialize as json:api responses
 - relationship resources
 - sparse fields
-- support for client generated IDS
+- support for client generated IDs
 - support top level meta objects
 
 ### Todo:
