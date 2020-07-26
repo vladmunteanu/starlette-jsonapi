@@ -24,13 +24,13 @@ Since this project is under development, please pin your dependencies to avoid p
 - relationship resources
 - sparse fields
 - support for client generated IDS
+- support top level meta objects
 
 ### Todo:
 - [pagination helpers](https://jsonapi.org/format/#fetching-pagination)
 - [sorting helpers](https://jsonapi.org/format/#fetching-sorting)
 - documentation
 - examples for other ORMs
-- [support meta objects](https://jsonapi.org/format/#document-meta)
 - [support jsonapi objects](https://jsonapi.org/format/#document-jsonapi-object)
 - [enforce member name validation](https://jsonapi.org/format/#document-member-names)
 - [optionally enforce query name validation](https://jsonapi.org/format/#query-parameters)
@@ -327,6 +327,13 @@ mentions:
 
 If you intend to use `uuid` IDs, set `id_mask = 'uuid'` when defining the Resource class, and some validation
 will be handled by Starlette. Requests with malformed IDS will likely result in 404 errors. 
+
+### Top level meta objects
+To include a `meta` object ([specification](https://jsonapi.org/format/#document-meta)) in the top level
+json:api response, you can pass a dictionary `meta` argument when calling `to_response`,
+in a primary or relationship resource:
+
+```to_response({'id': 123, ....}, meta={'copyright': 'FooBar'})```
 
 ## Contributing
 This project is in its early days, so **any** help is appreciated.
