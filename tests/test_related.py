@@ -725,3 +725,58 @@ def test_related_routes(relationship_links_app: Starlette):
     assert relationship_links_app.url_path_for(
         'test-resource:rel-id', id='1', related_id='2'
     ) == '/test-resource/1/rel/2'
+
+
+def test_relationship_resource_top_level_meta(app: Starlette):
+    class TSchema(JSONAPISchema):
+        id = fields.Str(dump_only=True)
+        name = fields.Str()
+
+        rel = JSONAPIRelationship(
+            schema='TRelatedSchema',
+            type_='test-related-resource',
+            include_resource_linkage=True,
+        )
+
+        class Meta:
+            type_ = 'test-resource'
+
+    class TRelatedSchema(JSONAPISchema):
+        id = fields.Str(dump_only=True)
+        description = fields.Str()
+
+        class Meta:
+            type_ = 'test-related-resource'
+
+    class TResource(BaseResource):
+        type_ = 'test-resource'
+        schema = TSchema
+
+    class TResourceRel(BaseRelationshipResource):
+        parent_resource = TResource
+        relationship_name = 'rel'
+
+        async def get(self, parent_id: str, *args, **kwargs) -> Response:
+            return await self.to_response(
+                await self.serialize(
+                    dict(
+                        id='foo', name='foo-name',
+                        rel=dict(id='bar', description='bar-description'),
+                    )
+                ),
+                meta={'some-meta-attribute': 'some-meta-value'},
+            )
+
+    TResource.register_routes(app, '/')
+    TResourceRel.register_routes(app)
+
+    test_client = TestClient(app)
+    rv = test_client.get('/test-resource/1/relationships/rel')
+    assert rv.status_code == 200
+    assert rv.json() == {
+        'data': {
+            'id': 'bar',
+            'type': 'test-related-resource',
+        },
+        'meta': {'some-meta-attribute': 'some-meta-value'},
+    }

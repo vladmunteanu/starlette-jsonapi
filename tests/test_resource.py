@@ -778,3 +778,39 @@ def test_client_generated_ids(app: Starlette):
             }
         }
     }
+
+
+def test_top_level_meta(app: Starlette):
+    class TSchema(JSONAPISchema):
+        id = fields.Str(dump_only=True)
+        name = fields.Str()
+
+        class Meta:
+            type_ = 'test-resource'
+
+    class TResource(BaseResource):
+        type_ = 'test-resource'
+        schema = TSchema
+
+        async def get_all(self, *args, **kwargs) -> Response:
+            return await self.to_response(
+                await self.serialize([dict(id=1, name='foo')], many=True),
+                meta={'some-meta-attribute': 'some-meta-value'},
+            )
+
+    TResource.register_routes(app, '/')
+    test_client = TestClient(app)
+    rv = test_client.get('/test-resource/')
+    assert rv.status_code == 200
+    assert rv.json() == {
+        'data': [{
+            'id': '1',
+            'type': 'test-resource',
+            'attributes': {
+                'name': 'foo',
+            }
+        }],
+        'meta': {
+            'some-meta-attribute': 'some-meta-value',
+        }
+    }
