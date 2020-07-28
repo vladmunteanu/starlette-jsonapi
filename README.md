@@ -11,7 +11,7 @@ any available async ORM. This also means that you are going to get a very basic 
 with some helpers to make your experience more pleasant, but nothing fancy.
 
 ##### Installing
-`pip install starlette-jsonapi==1.1.0`
+`pip install starlette-jsonapi==1.2.0`
 
 Since this project is under development, please pin your dependencies to avoid problems.
 
