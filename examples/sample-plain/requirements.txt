@@ -11,6 +11,6 @@ marshmallow-jsonapi==0.23.1  # via -r requirements.in
 marshmallow==3.6.1        # via -r requirements.in, marshmallow-jsonapi
 git+ssh://git@github.com/vladmunteanu/starlette-jsonapi  # via -r requirements.in
 starlette==0.12.8         # via -r requirements.in
-uvicorn==0.11.5           # via -r requirements.in
+uvicorn==0.11.7           # via -r requirements.in
 uvloop==0.14.0            # via uvicorn
 websockets==8.1           # via uvicorn
