@@ -9,7 +9,7 @@ app = Starlette()
 def create_app():
     register_tortoise(
         app,
-        db_url='postgres://accounts:accounts@localhost:5432/accounts',
+        db_url='sqlite://:memory:',
         modules={"models": ["accounts.models"]},
         generate_schemas=True,
     )
