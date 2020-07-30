@@ -35,12 +35,11 @@ In order to start the service on http://127.0.0.1:8000/, you can run:
 ## 2. sample-tortoise-orm
 Requires Python > 3.7 to avoid SQL injection bugs in tortoise-orm.
 
-Contains a basic implementation of 2 resources, `users` and `organizations` using tortoise-orm with a PostgreSQL database.
+Contains a basic implementation of 2 resources, `users` and `organizations` using tortoise-orm
+with an in memory SQLite database.
 
 #### Running:
-You should start the PostgreSQL database first, by running: `docker-compose up -d`
-
-Then you can start the service on http://127.0.0.1:8000/, by running:
+You can start the service on http://127.0.0.1:8000/, by running:
 `python start_service.py`
 
 
