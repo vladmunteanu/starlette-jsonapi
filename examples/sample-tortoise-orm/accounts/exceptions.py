@@ -7,3 +7,7 @@ class OrganizationNotFound(ResourceNotFound):
 
 class UserNotFound(ResourceNotFound):
     detail = 'User not found.'
+
+
+class TeamNotFound(ResourceNotFound):
+    detail = 'Team not found.'
