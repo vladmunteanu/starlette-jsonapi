@@ -1,6 +1,6 @@
 {
 	"info": {
-		"_postman_id": "9ec1ed0a-498f-4d4b-8cc3-7310c7768a92",
+		"_postman_id": "fe275b0d-87d9-418d-8ece-85e935aaa1c6",
 		"name": "starlette_jsonapi_client_example",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
@@ -89,6 +89,53 @@
 					"response": []
 				},
 				{
+					"name": "/api/users/<id>/organization",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://{{host}}/api/users/1/organization",
+							"protocol": "http",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"users",
+								"1",
+								"organization"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/users/<id>?include=organization",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://{{host}}/api/users/1?include=organization",
+							"protocol": "http",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"users",
+								"1"
+							],
+							"query": [
+								{
+									"key": "include",
+									"value": "organization"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
 					"name": "/api/users/<id>",
 					"protocolProfileBehavior": {
 						"disabledSystemHeaders": {
@@ -142,32 +189,375 @@
 						}
 					},
 					"response": []
-				},
+				}
+			],
+			"protocolProfileBehavior": {}
+		},
+		{
+			"name": "teams",
+			"item": [
 				{
-					"name": "/api/users/?include=organization",
+					"name": "/api/teams/",
 					"request": {
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "http://{{host}}/api/users/?include=organization",
+							"raw": "http://{{host}}/api/teams/",
 							"protocol": "http",
 							"host": [
 								"{{host}}"
 							],
 							"path": [
 								"api",
-								"users",
+								"teams",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/teams/?include=users",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://{{host}}/api/teams/?include=users",
+							"protocol": "http",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"teams",
 								""
 							],
 							"query": [
 								{
 									"key": "include",
-									"value": "organization"
+									"value": "users"
 								}
 							]
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "/api/teams/",
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {
+							"content-type": true
+						}
+					},
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"type": "text",
+								"value": "application/vnd.api+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"data\": {\n        \"type\": \"teams\",\n        \"attributes\": {\n            \"name\": \"team-name\"\n        },\n        \"relationships\": {\n            \"users\": {\n                \"data\": [\n                    {\n                        \"type\": \"users\",\n                        \"id\": \"1\"\n                    }\n                ]\n            }\n        }\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://{{host}}/api/teams/",
+							"protocol": "http",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"teams",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/teams/<id>",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://{{host}}/api/teams/1",
+							"protocol": "http",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"teams",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/teams/<id>/users",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://{{host}}/api/teams/1/users",
+							"protocol": "http",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"teams",
+								"1",
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/teams/<id>?include=users",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://{{host}}/api/teams/1?include=users",
+							"protocol": "http",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"teams",
+								"1"
+							],
+							"query": [
+								{
+									"key": "include",
+									"value": "users"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/teams/<id>",
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {
+							"content-type": true
+						}
+					},
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"type": "text",
+								"value": "application/vnd.api+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"data\": {\n        \"type\": \"teams\",\n        \"attributes\": {\n            \"name\": \"after-patch\"\n        },\n        \"relationships\": {\n            \"users\": {\n                \"data\": [\n                    {\n                        \"type\": \"users\",\n                        \"id\": \"2\"\n                    }\n                ]\n            }\n        }\n    }\n}"
+						},
+						"url": {
+							"raw": "http://{{host}}/api/teams/1",
+							"protocol": "http",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"teams",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/teams/<id>",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "http://{{host}}/api/teams/1",
+							"protocol": "http",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"teams",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/teams/<parent_id>/relationships/users",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://{{host}}/api/teams/1/relationships/users",
+							"protocol": "http",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"teams",
+								"1",
+								"relationships",
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/teams/<parent_id>/relationships/users",
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {
+							"content-type": true
+						}
+					},
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{
+								"key": "Content-Type",
+								"type": "text",
+								"value": "application/vnd.api+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"data\": []\n}"
+						},
+						"url": {
+							"raw": "http://{{host}}/api/teams/1/relationships/users",
+							"protocol": "http",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"teams",
+								"1",
+								"relationships",
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/teams/<parent_id>/relationships/users",
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {
+							"content-type": true
+						}
+					},
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"type": "text",
+								"value": "application/vnd.api+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"data\": [\n        {\n            \"type\": \"users\",\n            \"id\": \"1\"\n        }\n    ]\n}"
+						},
+						"url": {
+							"raw": "http://{{host}}/api/teams/1/relationships/users",
+							"protocol": "http",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"teams",
+								"1",
+								"relationships",
+								"users"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "/api/teams/<parent_id>/relationships/users",
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {
+							"content-type": true
+						}
+					},
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"type": "text",
+								"value": "application/vnd.api+json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"data\": [\n        {\n            \"type\": \"users\",\n            \"id\": \"1\"\n        }\n    ]\n}"
+						},
+						"url": {
+							"raw": "http://{{host}}/api/teams/1/relationships/users",
+							"protocol": "http",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"teams",
+								"1",
+								"relationships",
+								"users"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"id": "31c0b79b-8bf0-4623-82bb-e43584514f67",
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"id": "80f0b418-f2fb-4d29-8375-44939b1301c6",
+						"type": "text/javascript",
+						"exec": [
+							""
+						]
+					}
 				}
 			],
 			"protocolProfileBehavior": {}
@@ -315,7 +705,7 @@
 				{
 					"listen": "prerequest",
 					"script": {
-						"id": "03724333-ddfa-47bb-96e3-796df3e95e65",
+						"id": "a88d2cd1-9e71-4925-abfc-f5b6b705af55",
 						"type": "text/javascript",
 						"exec": [
 							""
@@ -325,329 +715,7 @@
 				{
 					"listen": "test",
 					"script": {
-						"id": "44b4437f-8e24-4941-84e5-5392730a8d90",
-						"type": "text/javascript",
-						"exec": [
-							""
-						]
-					}
-				}
-			],
-			"protocolProfileBehavior": {}
-		},
-		{
-			"name": "teams",
-			"item": [
-				{
-					"name": "/api/teams/",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "http://{{host}}/api/teams/",
-							"protocol": "http",
-							"host": [
-								"{{host}}"
-							],
-							"path": [
-								"api",
-								"teams",
-								""
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "/api/teams/",
-					"protocolProfileBehavior": {
-						"disabledSystemHeaders": {
-							"content-type": true
-						}
-					},
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"type": "text",
-								"value": "application/vnd.api+json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"data\": {\n        \"type\": \"teams\",\n        \"attributes\": {\n            \"name\": \"team-name\"\n        },\n        \"relationships\": {\n            \"users\": {\n                \"data\": [\n                    {\n                        \"type\": \"users\",\n                        \"id\": \"1\"\n                    }\n                ]\n            }\n        }\n    }\n}",
-							"options": {
-								"raw": {
-									"language": "json"
-								}
-							}
-						},
-						"url": {
-							"raw": "http://{{host}}/api/teams/",
-							"protocol": "http",
-							"host": [
-								"{{host}}"
-							],
-							"path": [
-								"api",
-								"teams",
-								""
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "/api/teams/<id>",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "http://{{host}}/api/teams/1",
-							"protocol": "http",
-							"host": [
-								"{{host}}"
-							],
-							"path": [
-								"api",
-								"teams",
-								"1"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "/api/teams/<id>",
-					"protocolProfileBehavior": {
-						"disabledSystemHeaders": {
-							"content-type": true
-						}
-					},
-					"request": {
-						"method": "PATCH",
-						"header": [
-							{
-								"key": "Content-Type",
-								"type": "text",
-								"value": "application/vnd.api+json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"data\": {\n        \"type\": \"teams\",\n        \"attributes\": {\n            \"name\": \"after-patch\"\n        }\n    }\n}"
-						},
-						"url": {
-							"raw": "http://{{host}}/api/teams/1",
-							"protocol": "http",
-							"host": [
-								"{{host}}"
-							],
-							"path": [
-								"api",
-								"teams",
-								"1"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "/api/teams/<id>",
-					"request": {
-						"method": "DELETE",
-						"header": [],
-						"url": {
-							"raw": "http://{{host}}/api/teams/1",
-							"protocol": "http",
-							"host": [
-								"{{host}}"
-							],
-							"path": [
-								"api",
-								"teams",
-								"1"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "/api/teams/?include=users",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "http://{{host}}/api/teams/?include=users",
-							"protocol": "http",
-							"host": [
-								"{{host}}"
-							],
-							"path": [
-								"api",
-								"teams",
-								""
-							],
-							"query": [
-								{
-									"key": "include",
-									"value": "users"
-								}
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "/api/teams/<parent_id>/relationships/users",
-					"request": {
-						"method": "GET",
-						"header": [],
-						"url": {
-							"raw": "http://{{host}}/api/teams/1/relationships/users",
-							"protocol": "http",
-							"host": [
-								"{{host}}"
-							],
-							"path": [
-								"api",
-								"teams",
-								"1",
-								"relationships",
-								"users"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "/api/teams/<parent_id>/relationships/users",
-					"protocolProfileBehavior": {
-						"disabledSystemHeaders": {
-							"content-type": true
-						}
-					},
-					"request": {
-						"method": "PATCH",
-						"header": [
-							{
-								"key": "Content-Type",
-								"type": "text",
-								"value": "application/vnd.api+json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"data\": []\n}"
-						},
-						"url": {
-							"raw": "http://{{host}}/api/teams/1/relationships/users",
-							"protocol": "http",
-							"host": [
-								"{{host}}"
-							],
-							"path": [
-								"api",
-								"teams",
-								"1",
-								"relationships",
-								"users"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "/api/teams/<parent_id>/relationships/users",
-					"protocolProfileBehavior": {
-						"disabledSystemHeaders": {
-							"content-type": true
-						}
-					},
-					"request": {
-						"method": "POST",
-						"header": [
-							{
-								"key": "Content-Type",
-								"type": "text",
-								"value": "application/vnd.api+json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"data\": [\n        {\n            \"type\": \"users\",\n            \"id\": \"2\"\n        }\n    ]\n}"
-						},
-						"url": {
-							"raw": "http://{{host}}/api/teams/1/relationships/users",
-							"protocol": "http",
-							"host": [
-								"{{host}}"
-							],
-							"path": [
-								"api",
-								"teams",
-								"1",
-								"relationships",
-								"users"
-							]
-						}
-					},
-					"response": []
-				},
-				{
-					"name": "/api/teams/<parent_id>/relationships/users",
-					"protocolProfileBehavior": {
-						"disabledSystemHeaders": {
-							"content-type": true
-						}
-					},
-					"request": {
-						"method": "DELETE",
-						"header": [
-							{
-								"key": "Content-Type",
-								"type": "text",
-								"value": "application/vnd.api+json"
-							}
-						],
-						"body": {
-							"mode": "raw",
-							"raw": "{\n    \"data\": [\n        {\n            \"type\": \"users\",\n            \"id\": \"1\"\n        }\n    ]\n}"
-						},
-						"url": {
-							"raw": "http://{{host}}/api/teams/1/relationships/users",
-							"protocol": "http",
-							"host": [
-								"{{host}}"
-							],
-							"path": [
-								"api",
-								"teams",
-								"1",
-								"relationships",
-								"users"
-							]
-						}
-					},
-					"response": []
-				}
-			],
-			"event": [
-				{
-					"listen": "prerequest",
-					"script": {
-						"id": "6d3e81df-836b-406f-9328-9de32ce8b0a0",
-						"type": "text/javascript",
-						"exec": [
-							""
-						]
-					}
-				},
-				{
-					"listen": "test",
-					"script": {
-						"id": "efb9017a-266b-4514-81e8-0da7e2a9c6df",
+						"id": "c76a9b89-43b9-4da1-9b2b-cea25949f99c",
 						"type": "text/javascript",
 						"exec": [
 							""
@@ -662,7 +730,7 @@
 		{
 			"listen": "prerequest",
 			"script": {
-				"id": "042452bb-e4e5-4e36-9b7b-3a57e1dd8fc6",
+				"id": "b7528020-dcb3-415e-9921-d1e49fcf0009",
 				"type": "text/javascript",
 				"exec": [
 					""
@@ -672,7 +740,7 @@
 		{
 			"listen": "test",
 			"script": {
-				"id": "f23e09cd-5635-4615-9274-b70588fa101a",
+				"id": "99cbca6c-db89-45bc-a947-627873d2eb16",
 				"type": "text/javascript",
 				"exec": [
 					""
@@ -682,7 +750,7 @@
 	],
 	"variable": [
 		{
-			"id": "82a9570f-fae0-49ef-87fa-65998b0fe29d",
+			"id": "f33007ae-f371-49b6-b614-32454e0fbbb0",
 			"key": "host",
 			"value": "127.0.0.1:8000"
 		}

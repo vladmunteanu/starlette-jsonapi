@@ -89,7 +89,9 @@ class TeamsResource(BaseResource):
             await team.users.add(*users)
 
         await team.save()
-
+        # `team.users.add` did not actually update the `users` on `team`,
+        # so we need to fetch them again
+        await team.fetch_related('users')
         return await self.to_response(await self.serialize(data=team))
 
     async def delete(self, id=None, *args, **kwargs) -> Response:
@@ -126,6 +128,8 @@ class TeamsResource(BaseResource):
         await team.users.add(*users)
         await team.save()
 
+        # After save, tortoise-orm still sees `team.user` as [], so we need to fetch them again.
+        # It also prevents us from setting the `users` attribute on `team`.
         await team.fetch_related('users')
         result = await self.serialize(data=team)
         return await self.to_response(result, status_code=201)
@@ -174,6 +178,7 @@ class TeamUsersResource(BaseRelationshipResource):
         await team.users.clear()
         await team.users.add(*users)
         await team.save()
+        await team.fetch_related('users')
         return await self.to_response(await self.serialize(data=team))
 
     async def post(self, parent_id: str, *args, **kwargs) -> Response:
@@ -193,6 +198,7 @@ class TeamUsersResource(BaseRelationshipResource):
             users.append(user)
         await team.users.add(*users)
         await team.save()
+        await team.fetch_related('users')
         return await self.to_response(await self.serialize(data=team))
 
     async def delete(self, parent_id: str, *args, **kwargs) -> Response:
@@ -213,4 +219,5 @@ class TeamUsersResource(BaseRelationshipResource):
             users.append(user)
         await team.users.remove(*users)
         await team.save()
+        await team.fetch_related('users')
         return await self.to_response(await self.serialize(data=team))
