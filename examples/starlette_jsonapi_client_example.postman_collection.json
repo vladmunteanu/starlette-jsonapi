@@ -350,6 +350,32 @@
 					"response": []
 				},
 				{
+					"name": "/api/teams/<id>?include=users,users.organization",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://{{host}}/api/teams/1?include=users,users.organization",
+							"protocol": "http",
+							"host": [
+								"{{host}}"
+							],
+							"path": [
+								"api",
+								"teams",
+								"1"
+							],
+							"query": [
+								{
+									"key": "include",
+									"value": "users,users.organization"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
 					"name": "/api/teams/<id>",
 					"protocolProfileBehavior": {
 						"disabledSystemHeaders": {
@@ -750,7 +776,7 @@
 	],
 	"variable": [
 		{
-			"id": "f33007ae-f371-49b6-b614-32454e0fbbb0",
+			"id": "7d7aeebc-88a4-4b2e-9879-bbb8fa903234",
 			"key": "host",
 			"value": "127.0.0.1:8000"
 		}

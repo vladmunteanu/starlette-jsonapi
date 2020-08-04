@@ -52,6 +52,10 @@ class TeamsResource(BaseResource):
         """
         if 'users' in relations:
             await obj.fetch_related('users')
+        if 'users.organization' in relations:
+            await obj.fetch_related('users')
+            for user in obj.users:
+                await user.fetch_related('organization')
 
     async def get(self, id=None, *args, **kwargs) -> Response:
         if not id:
