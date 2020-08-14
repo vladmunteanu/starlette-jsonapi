@@ -10,6 +10,9 @@ class Organization(models.Model):
     def __str__(self) -> str:
         return f"Organization {self.id}: {self.name}"
 
+    def __repr__(self) -> str:
+        return f"Organization {self.id}: {self.name}"
+
 
 class User(models.Model):
     id = fields.IntField(pk=True)
@@ -19,3 +22,19 @@ class User(models.Model):
 
     def __str__(self) -> str:
         return f"User {self.id}: {self.username}"
+
+    def __repr__(self) -> str:
+        return f"User {self.id}: {self.username}"
+
+
+class Team(models.Model):
+    id = fields.IntField(pk=True)
+    name = fields.CharField(max_length=256)
+
+    users = fields.ManyToManyField('models.User', related_name='teams')
+
+    def __str__(self) -> str:
+        return f"Team {self.id}: {self.name}"
+
+    def __repr__(self) -> str:
+        return f"Team {self.id}: {self.name}"

@@ -11,7 +11,7 @@ any available async ORM. This also means that you are going to get a very basic 
 with some helpers to make your experience more pleasant, but nothing fancy.
 
 ##### Installing
-`pip install starlette-jsonapi==0.1.1`
+`pip install starlette-jsonapi==1.2.0`
 
 Since this project is under development, please pin your dependencies to avoid problems.
 
@@ -23,17 +23,17 @@ Since this project is under development, please pin your dependencies to avoid p
 - exception handlers to serialize as json:api responses
 - relationship resources
 - sparse fields
+- support for client generated IDs
+- support top level meta objects
 
 ### Todo:
 - [pagination helpers](https://jsonapi.org/format/#fetching-pagination)
 - [sorting helpers](https://jsonapi.org/format/#fetching-sorting)
 - documentation
 - examples for other ORMs
-- [support meta objects](https://jsonapi.org/format/#document-meta)
 - [support jsonapi objects](https://jsonapi.org/format/#document-jsonapi-object)
 - [enforce member name validation](https://jsonapi.org/format/#document-member-names)
 - [optionally enforce query name validation](https://jsonapi.org/format/#query-parameters)
-- [support client generated ids](https://jsonapi.org/format/#crud-creating-client-ids)
 
 ## Documentation
 You should take a look at the [examples](examples) directory for implementations.
@@ -106,7 +106,8 @@ so the `BaseResource` comes with 5 methods that you can override:
 All methods return 405 Method Not Allowed by default.
 You can also customize `allowed_methods` to a subset of the above HTTP methods.
 
-Additionally, the `prepare_relations` method is available for enabling inclusion of related resources.
+Additionally, the `prepare_relations` method is available for enabling inclusion of related
+resources when the `include` query parameter is specified.
 Since the json:api specification does not enforce this, the default implementation will skip inclusion
 in order to avoid data leaks.
 
@@ -167,6 +168,10 @@ class ExampleResource(BaseResource):
         return await self.to_response(await self.serialize(example), status_code=201)
 ```
 
+Also optional, you can support fetching related data for requests like `/articles/1/author`,
+by implementing `get_related`, then calling `serialize_related` with the related data.
+Check [sample-plain](examples/sample-plain) for an implementation example.
+
 ### Defining a relationship resource
 You can choose to define a relationship resource by subclassing `starlette_jsonapi.resource.BaseRelationshipResource`.
 
@@ -206,9 +211,9 @@ class EmployeeSchema(JSONAPISchema):
         type_='employees',
         schema='EmployeeSchema',
         include_resource_linkage=True,
-        self_route='employees:manager',
+        self_route='employees:relationships-manager',
         self_route_kwargs={'parent_id': '<id>'},
-        related_route='employees:get',
+        related_route='employees:manager',
         related_route_kwargs={'id': '<id>'},
     )
 
@@ -228,7 +233,7 @@ EmployeeResource.register_routes(app=app, base_path='/')
 EmployeeManagerResource.register_routes(app=app)
 ```
 
-#### Registering resource paths
+### Registering resource paths
 To register a defined resource class, we need to add the appropriate paths to the Starlette app.
 Considering the ExampleResource implementation above, it's as simple as:
 ```python
@@ -271,12 +276,64 @@ Which will cause the routes to be registered:
 - DELETE `/api/v2/examples/{id:str}`
 
 
-#### Accessing the request
+### Accessing the request
 While handling a request inside a resource, you can use `self.request` to access the Starlette Request object.
 
-#### Accessing the request body
+### Accessing the request body
 Although directly accessible from `self.request`, you should probably use `self.deserialize_body`
 to raise any validation errors as 400 HTTP responses, while benefiting from a cleaner payload.
+
+### Links
+
+Links are relative by default. You can add a static prefix to the generated links url by adding an `url_prefix` attribute to your app instance.
+
+Setting up the app with
+```python
+from starlette.applications import Starlette
+
+app = Starlette()
+app.url_prefix = 'https://example.com'
+```
+Will produce the following links
+```
+{
+    'data': {
+        'id': 'foo',
+        'type': 'test-resource',
+        'attributes': {
+            'name': 'foo-name',
+        },
+        'links': {
+            'self': 'https://example.com/test-resource/foo',
+        },
+    },
+    'links': {
+        'self': 'https://example.com/test-resource/foo',
+    },
+}
+```
+
+### Client generated IDs
+The JSON:API spec mentions:
+> A server MAY accept a client-generated ID along with a request to create a resource. 
+
+To enable client generated IDS, specify the Schema's `id` field without the usual `dump_only`
+attribute that has been presented in this documentation.
+Doing this will make `marshmallow` read the `id` field when `deserialize_body` is called.
+
+Note: Validation of the client generated ID is not provided by this framework, but the specification
+mentions:
+> An ID MUST be specified with an id key, the value of which MUST be a universally unique identifier.
+
+If you intend to use `uuid` IDs, set `id_mask = 'uuid'` when defining the Resource class, and some validation
+will be handled by Starlette. Requests with malformed IDS will likely result in 404 errors. 
+
+### Top level meta objects
+To include a `meta` object ([specification](https://jsonapi.org/format/#document-meta)) in the top level
+json:api response, you can pass a dictionary `meta` argument when calling `to_response`,
+in a primary or relationship resource:
+
+```to_response({'id': 123, ....}, meta={'copyright': 'FooBar'})```
 
 ## Contributing
 This project is in its early days, so **any** help is appreciated.

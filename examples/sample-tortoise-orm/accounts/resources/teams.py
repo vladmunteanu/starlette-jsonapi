@@ -4,6 +4,7 @@ from typing import List, Any
 from marshmallow_jsonapi import fields
 from starlette.exceptions import HTTPException
 from starlette.responses import Response
+from tortoise.exceptions import DoesNotExist
 
 from starlette_jsonapi.fields import JSONAPIRelationship
 from starlette_jsonapi.resource import BaseResource, BaseRelationshipResource
@@ -47,17 +48,21 @@ class TeamsResource(BaseResource):
 
     async def prepare_relations(self, obj: Team, relations: List[str]):
         """
-        We override this to allow `included` requests against this resource,
-        but we don't actually have to do anything here.
-        The attribute is already populated because we're using plain NamedTuples.
+        We override this to allow `included` requests against this resource.
         """
-        return None
+        if 'users' in relations:
+            await obj.fetch_related('users')
+        if 'users.organization' in relations:
+            await obj.fetch_related('users')
+            for user in obj.users:
+                await user.fetch_related('organization')
 
     async def get(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise TeamNotFound
-        team = Team.get_item(id)
-        if not team:
+        try:
+            team = await Team.get(id=id).prefetch_related('users')
+        except DoesNotExist:
             raise TeamNotFound
 
         return await self.to_response(await self.serialize(data=team))
@@ -65,8 +70,9 @@ class TeamsResource(BaseResource):
     async def patch(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise TeamNotFound
-        team = Team.get_item(id)
-        if not team:
+        try:
+            team = await Team.get(id=id).prefetch_related('users')
+        except DoesNotExist:
             raise TeamNotFound
 
         json_body = await self.deserialize_body(partial=True)
@@ -76,58 +82,66 @@ class TeamsResource(BaseResource):
 
         user_ids = json_body.get('users')
         if user_ids:
+            await team.users.clear()
             users = []
             for user_id in user_ids:
-                user = User.get_item(int(user_id))
-                if not user:
+                try:
+                    user = await User.get(id=int(user_id))
+                except DoesNotExist:
                     raise UserNotFound
                 users.append(user)
-            team.users = users
+            await team.users.add(*users)
 
-        team.save()
-
+        await team.save()
+        # `team.users.add` did not actually update the `users` on `team`,
+        # so we need to fetch them again
+        await team.fetch_related('users')
         return await self.to_response(await self.serialize(data=team))
 
     async def delete(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise TeamNotFound
-        team = Team.get_item(id)
-        if not team:
+        try:
+            team = await Team.get(id=id)
+        except DoesNotExist:
             raise TeamNotFound
 
-        team.delete()
+        await team.delete()
 
         return JSONAPIResponse(status_code=204)
 
     async def get_all(self, *args, **kwargs) -> Response:
-        teams = Team.get_items()
+        teams = await Team.all().prefetch_related('users')
         return await self.to_response(await self.serialize(data=teams, many=True))
 
     async def post(self, *args, **kwargs) -> Response:
         json_body = await self.deserialize_body()
 
-        team = Team()
         name = json_body.get('name')
-        if name:
-            team.name = name
-
         user_ids = json_body['users']
         users = []
         for user_id in user_ids:
-            user = User.get_item(int(user_id))
-            if not user:
+            try:
+                user = await User.get(id=int(user_id))
+            except DoesNotExist:
                 raise UserNotFound
             users.append(user)
-        team.users = users
 
-        team.save()
+        team = await Team.create(name=name)
+        await team.fetch_related('users')
+        await team.users.add(*users)
+        await team.save()
 
+        # After save, tortoise-orm still sees `team.user` as [], so we need to fetch them again.
+        # It also prevents us from setting the `users` attribute on `team`.
+        await team.fetch_related('users')
         result = await self.serialize(data=team)
         return await self.to_response(result, status_code=201)
 
     async def get_related(self, id: Any, relationship: str, related_id: Any = None, *args, **kwargs) -> Response:
-        team = Team.get_item(id)
-        if not team:
+        try:
+            team = await Team.get(id=id).prefetch_related('users')
+        except DoesNotExist:
             raise TeamNotFound
         if relationship == 'users':
             if not related_id:
@@ -144,60 +158,70 @@ class TeamUsersResource(BaseRelationshipResource):
     relationship_name = 'users'
 
     async def get(self, parent_id: str, *args, **kwargs) -> Response:
-        team = Team.get_item(int(parent_id))
-        if not team:
+        try:
+            team = await Team.get(id=int(parent_id)).prefetch_related('users')
+        except DoesNotExist:
             raise TeamNotFound
         return await self.to_response(await self.serialize(data=team))
 
     async def patch(self, parent_id: str, *args, **kwargs) -> Response:
-        team = Team.get_item(int(parent_id))
-        if not team:
+        """ replacing users """
+        try:
+            team = await Team.get(id=int(parent_id)).prefetch_related('users')
+        except DoesNotExist:
             raise TeamNotFound
 
-        user_ids = await self.deserialize_ids()
-        if not user_ids:
-            users = []
-        else:
-            users = []
-            for user_id in user_ids:
-                user = User.get_item(int(user_id))
-                if not user:
-                    raise UserNotFound
-                users.append(user)
-        team.users = users
-        team.save()
+        user_ids = await self.deserialize_ids() or []
+        users = []
+        for user_id in user_ids:
+            try:
+                user = await User.get(id=int(user_id))
+            except DoesNotExist:
+                raise UserNotFound
+            users.append(user)
+        await team.users.clear()
+        await team.users.add(*users)
+        await team.save()
+        await team.fetch_related('users')
         return await self.to_response(await self.serialize(data=team))
 
     async def post(self, parent_id: str, *args, **kwargs) -> Response:
-        team = Team.get_item(int(parent_id))
-        if not team:
+        """ associating with specific users """
+        try:
+            team = await Team.get(id=int(parent_id)).prefetch_related('users')
+        except DoesNotExist:
             raise TeamNotFound
 
-        user_ids = await self.deserialize_ids()
-        if not user_ids:
-            users = []
-        else:
-            users = team.users
-            for user_id in user_ids:
-                user = User.get_item(int(user_id))
-                if not user:
-                    raise UserNotFound
-                users.append(user)
-        team.users = users
-        team.save()
+        user_ids = await self.deserialize_ids() or []
+        users = []
+        for user_id in user_ids:
+            try:
+                user = await User.get(id=int(user_id))
+            except DoesNotExist:
+                raise UserNotFound
+            users.append(user)
+        await team.users.add(*users)
+        await team.save()
+        await team.fetch_related('users')
         return await self.to_response(await self.serialize(data=team))
 
     async def delete(self, parent_id: str, *args, **kwargs) -> Response:
-        team = Team.get_item(int(parent_id))
-        if not team:
+        """ deleting association with specific users """
+        try:
+            team = await Team.get(id=int(parent_id)).prefetch_related('users')
+        except DoesNotExist:
             raise TeamNotFound
         user_ids = await self.deserialize_ids()
         if not user_ids:
             user_ids = []
         users = []
-        for user in team.users:
-            if str(user.id) not in user_ids:
-                users.append(user)
-        team.users = users
-        team.save()
+        for user_id in user_ids:
+            try:
+                user = await User.get(id=int(user_id))
+            except DoesNotExist:
+                raise UserNotFound
+            users.append(user)
+        await team.users.remove(*users)
+        await team.save()
+        await team.fetch_related('users')
         return await self.to_response(await self.serialize(data=team))

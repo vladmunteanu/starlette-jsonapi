@@ -1,6 +1,12 @@
+from typing import Dict
+
 from marshmallow import EXCLUDE
+from marshmallow.fields import Field
 from marshmallow_jsonapi import Schema as __Schema, SchemaOpts as __SchemaOpts
+from marshmallow_jsonapi.utils import resolve_params
 from starlette.applications import Starlette
+
+from starlette_jsonapi.utils import prefix_url_path
 
 
 class BaseSchemaOpts(__SchemaOpts):
@@ -56,12 +62,29 @@ class JSONAPISchema(__Schema):
 
     def __init__(self, *args, **kwargs):
         self.app = kwargs.pop('app', None)  # type: Starlette
+        # allow changing links through self_related_route, self_related_route_kwargs
+        self.self_related_route = kwargs.pop('self_related_route', None)
+        self.self_related_route_kwargs = kwargs.pop('self_related_route_kwargs', None)
+
         super().__init__(*args, **kwargs)
 
     def generate_url(self, link, **kwargs):
         if self.app and isinstance(self.app, Starlette) and link:
-            return self.app.url_path_for(link, **kwargs)
+            return prefix_url_path(self.app, link, **kwargs)
         return None
+
+    def get_top_level_links(self, data, many):
+        """ Overriding base implementation to support serialization as a related resource. """
+        self_link = None
+        if self.self_related_route:
+            if many:
+                kwargs = self.self_related_route_kwargs
+            else:
+                kwargs = resolve_params(data, self.self_related_route_kwargs)
+            self_link = self.generate_url(self.self_related_route, **kwargs)
+        if self_link:
+            return {"self": self_link}
+        return super().get_top_level_links(data, many)
 
     def get_resource_links(self, item):
         """ Override the marshmallow-jsonapi implementation to check for None links. """
@@ -69,3 +92,7 @@ class JSONAPISchema(__Schema):
         if links and isinstance(links, dict) and links.get('self'):
             return links
         return None
+
+    @classmethod
+    def get_fields(cls) -> Dict[str, Field]:
+        return cls._declared_fields

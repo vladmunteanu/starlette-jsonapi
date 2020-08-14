@@ -9,7 +9,7 @@ app = Starlette()
 def create_app():
     register_tortoise(
         app,
-        db_url='postgres://accounts:accounts@localhost:5432/accounts',
+        db_url='sqlite://:memory:',
         modules={"models": ["accounts.models"]},
         generate_schemas=True,
     )
@@ -18,8 +18,9 @@ def create_app():
     register_jsonapi_exception_handlers(app)
 
     # register routes
-    from accounts.resources import users, organizations
+    from accounts.resources import users, organizations, teams
     users.UsersResource.register_routes(app, '/api')
     organizations.OrganizationsResource.register_routes(app, '/api')
-
+    teams.TeamsResource.register_routes(app, '/api')
+    teams.TeamUsersResource.register_routes(app)
     return app

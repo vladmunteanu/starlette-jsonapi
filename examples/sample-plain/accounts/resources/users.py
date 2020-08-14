@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import List, Any
 
 from marshmallow_jsonapi import fields
 from starlette.exceptions import HTTPException
@@ -25,6 +25,9 @@ class UserSchema(JSONAPISchema):
         schema='OrganizationSchema',
         include_resource_linkage=True,
         required=True,
+        related_resource='OrganizationsResource',
+        related_route='users:organization',
+        related_route_kwargs={'id': '<id>'},
     )
 
     class Meta:
@@ -114,3 +117,12 @@ class UsersResource(BaseResource):
 
         result = await self.serialize(data=user)
         return await self.to_response(result, status_code=201)
+
+    async def get_related(self, id: Any, relationship: str, related_id: Any = None, *args, **kwargs) -> Response:
+        user = User.get_item(id)
+        if not user:
+            raise UserNotFound
+
+        if relationship == 'organization' and related_id is None:
+            return await self.to_response(await self.serialize_related(user.organization))
+        raise HTTPException(status_code=404)

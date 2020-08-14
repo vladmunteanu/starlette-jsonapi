@@ -1,5 +1,5 @@
 import logging
-from typing import Type, Any, List, Optional, Union, Sequence
+from typing import Type, Any, List, Optional, Union, Sequence, Dict
 
 from marshmallow.exceptions import ValidationError
 from starlette.applications import Starlette
@@ -9,6 +9,7 @@ from starlette.routing import Route, Mount
 
 from starlette_jsonapi.exceptions import JSONAPIException, HTTPException
 from starlette_jsonapi.fields import JSONAPIRelationship
+from starlette_jsonapi.meta import RegisteredResourceMeta
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
 from starlette_jsonapi.pagination import BasePaginator, Pagination
@@ -21,7 +22,7 @@ from starlette_jsonapi.utils import (
 logger = logging.getLogger(__name__)
 
 
-class BaseResource:
+class BaseResource(metaclass=RegisteredResourceMeta):
     """ A basic json:api resource implementation, data layer agnostic. """
 
     # The json:api type, used to compute the path for this resource
@@ -49,7 +50,7 @@ class BaseResource:
     # Paginator class, subclass of BasePaginator
     pagination_class: Optional[Type[BasePaginator]] = None
 
-    # Optional, by default this will equal `type_` and will be used to register the Mount name.
+    # Optional, by default this will equal `type_` and will be used as the `mount` name.
     # Impacts the result of `url_path_for`, so it can be used to support multiple resource versions.
     # For example:
     # ```
@@ -65,9 +66,21 @@ class BaseResource:
     # ```
     # `url_path_for` will
     register_as: str = ''
+    mount: Mount
 
-    def __init__(self, request: Request, *args, **kwargs) -> None:
+    # Switch for controlling meta class registration.
+    # Being able to refer to another resource via its name,
+    # rather than directly passing it, will prevent circular imports in projects.
+    # By default, subclasses are registered.
+    register_resource = False
+
+    # This will be populated when routes are registered and we detect related resources.
+    # Used in `serialize_related`.
+    _related: Dict[str, Type['BaseResource']]
+
+    def __init__(self, request: Request, request_context: dict = None, *args, **kwargs) -> None:
         self.request = request
+        self.request_context = request_context or {}
 
     async def get(self, id=None, *args, **kwargs) -> Response:
         raise JSONAPIException(status_code=405)
@@ -82,6 +95,14 @@ class BaseResource:
         raise JSONAPIException(status_code=405)
 
     async def post(self, *args, **kwargs) -> Response:
+        raise JSONAPIException(status_code=405)
+
+    async def get_related(self, id: Any, relationship: str, related_id: Any = None, *args, **kwargs) -> Response:
+        """
+        Subclasses should implement this if they specify relationships
+        and want to support fetching related resources.
+        By default returns a 405 error.
+        """
         raise JSONAPIException(status_code=405)
 
     async def deserialize_body(self, partial=None) -> dict:
@@ -133,11 +154,46 @@ class BaseResource:
             sparse_body['links'] = links
         return sparse_body
 
-    async def to_response(self, data: dict, *args, **kwargs) -> JSONAPIResponse:
+    async def serialize_related(self, data: Any, many=False, *args, **kwargs) -> dict:
+        """
+        Serializes related data as a JSON:API payload and returns a `dict`
+        which can be passed when calling `BaseResource.to_response`.
+
+        When serializing related resources, the related items are passed as `data` instead of the parent objects.
+
+        Additional args and kwargs are passed to the `marshmallow` based Schema.
+        """
+        relationship = self.request_context['relationship']
+        parent_id = self.request_context['id']
+        related_resource_cls = self.__class__._related[relationship]  # type: Type[BaseResource]
+        related_route = f'{self.mount.name}:{relationship}'
+        related_route_kwargs = {
+            'id': parent_id,
+            # 'relationship': relationship,
+        }
+        if self.request_context.get('related_id'):
+            related_route += '-id'
+            related_route_kwargs.update(related_id='<id>')
+
+        related_schema = related_resource_cls.schema(
+            app=self.request.app,
+            self_related_route=related_route,
+            self_related_route_kwargs=related_route_kwargs,
+            *args, **kwargs,
+        )  # type: JSONAPISchema
+        body = related_schema.dump(data, many=many)
+        sparse_body = await self.process_sparse_fields(body, many=many)
+        return sparse_body
+
+    async def to_response(self, data: dict, meta: dict = None, *args, **kwargs) -> JSONAPIResponse:
         """
         Wraps `data` in a JSONAPIResponse object and returns it.
+        If `meta` is specified, it will be included as the top level `meta` object in the json:api response.
         Additional args and kwargs are passed to the `starlette` based Response.
         """
+        if meta:
+            data = data.copy()
+            data.update(meta=meta)
         return JSONAPIResponse(
             content=data,
             *args, **kwargs,
@@ -158,7 +214,7 @@ class BaseResource:
 
     @classmethod
     async def handle_request(
-            cls, handler_name: str, request: Request,
+            cls, handler_name: str, request: Request, request_context: dict = None,
             extract_id: bool = False, *args, **kwargs
     ) -> Response:
         """
@@ -166,14 +222,16 @@ class BaseResource:
         Additional args and kwargs are passed to the handler method,
         which is usually one of: `get`, `patch`, `delete`, `get_all` or `post`.
         """
+        request_context = request_context or {}
         if extract_id:
             id_ = request.path_params.get('id')
             kwargs.update({'id': id_})
+            request_context.update({'id': id_})
 
         try:
             if request.method not in cls.allowed_methods:
                 raise JSONAPIException(status_code=405)
-            resource = cls(request)
+            resource = cls(request, request_context=request_context)
             handler = getattr(resource, handler_name, None)
             response = await handler(*args, **kwargs)  # type: Response
         except Exception as e:
@@ -201,38 +259,82 @@ class BaseResource:
         return await cls.handle_request(handler_name='post', request=request)
 
     @classmethod
-    def register_routes(cls, app: Starlette, base_path: str):
-        if not cls.type_:
-            raise Exception('Cannot register a resource without specifying its `type_`.')
-        name = cls.register_as or cls.type_
-        app.routes.append(
-            Mount(
-                name=name,
-                path='{}/{}'.format(base_path.rstrip('/'), cls.type_),
-                routes=[
-                    Route(
-                        '/{{id:{}}}'.format(cls.id_mask), cls.handle_get,
-                        methods=['GET'], name='get',
-                    ),
-                    Route(
-                        '/{{id:{}}}'.format(cls.id_mask), cls.handle_patch,
-                        methods=['PATCH'], name='patch',
-                    ),
-                    Route(
-                        '/{{id:{}}}'.format(cls.id_mask), cls.handle_delete,
-                        methods=['DELETE'], name='delete',
-                    ),
-                    Route(
-                        '/', cls.handle_get_all,
-                        methods=['GET'], name='get_all',
-                    ),
-                    Route(
-                        '/', cls.handle_post,
-                        methods=['POST'], name='post',
-                    ),
-                ],
-            )
+    async def handle_get_related(cls, request: Request, relationship: str = None):
+        """ Handles related resources requests, such as /articles/1/author. """
+        related_id = request.path_params.get('related_id')
+        request_context = {'relationship': relationship, 'related_id': related_id}
+        return await cls.handle_request(
+            handler_name='get_related', request=request,
+            relationship=relationship, related_id=related_id,
+            request_context=request_context,
+            extract_id=True,
         )
+
+    @classmethod
+    def register_routes(cls, app: Starlette, base_path: str):
+        if not cls.type_ or not cls.schema:
+            raise Exception('Cannot register a resource without specifying its `type_` and its `schema`.')
+
+        # find relationships with `related_resource` specified
+        cls._related = {}
+        for fname, field in cls.schema.get_fields().items():
+            if isinstance(field, JSONAPIRelationship):
+                if field.related_resource:
+                    cls._related[fname] = field.related_resource_class
+
+        # attach secondary related routes, example: /articles/1/author/1
+        routes = [
+            Route(
+                '/{{id:{}}}/{}/{{related_id:{}}}'.format(cls.id_mask, rel_name, rel_class.id_mask),
+                _partial(relationship=rel_name)(cls.handle_get_related),
+                methods=['GET'],
+                name=f'{rel_name}-id',
+            )
+            for rel_name, rel_class in cls._related.items()
+        ]
+        # attach related routes, example: /articles/1/author
+        routes += [
+            Route(
+                '/{{id:{}}}/{}'.format(cls.id_mask, rel_name),
+                _partial(relationship=rel_name)(cls.handle_get_related),
+                methods=['GET'],
+                name=rel_name,
+            )
+            for rel_name in cls._related
+        ]
+
+        # attach primary routes, example: /articles/ and /articles/1
+        routes += [
+            Route(
+                '/{{id:{}}}'.format(cls.id_mask), cls.handle_get,
+                methods=['GET'], name='get',
+            ),
+            Route(
+                '/{{id:{}}}'.format(cls.id_mask), cls.handle_patch,
+                methods=['PATCH'], name='patch',
+            ),
+            Route(
+                '/{{id:{}}}'.format(cls.id_mask), cls.handle_delete,
+                methods=['DELETE'], name='delete',
+            ),
+            Route(
+                '/', cls.handle_get_all,
+                methods=['GET'], name='get_all',
+            ),
+            Route(
+                '/', cls.handle_post,
+                methods=['POST'], name='post',
+            ),
+        ]
+
+        name = cls.register_as or cls.type_
+        cls.mount = Mount(
+            name=name,
+            path='{}/{}'.format(base_path.rstrip('/'), cls.type_),
+            routes=routes,
+        )
+
+        app.routes.append(cls.mount)
 
     # Methods used to generate compound documents
     # https://jsonapi.org/format/#document-compound-documents
@@ -357,11 +459,15 @@ class BaseRelationshipResource:
         body = relationship.serialize(self.relationship_name, data)
         return body
 
-    async def to_response(self, data: dict, *args, **kwargs) -> JSONAPIResponse:
+    async def to_response(self, data: dict, meta: dict = None, *args, **kwargs) -> JSONAPIResponse:
         """
         Wraps `data` in a JSONAPIResponse object and returns it.
+        If `meta` is specified, it will be included as the top level `meta` object in the json:api response.
         Additional args and kwargs are passed to the `starlette` based Response.
         """
+        if meta:
+            data = data.copy()
+            data.update(meta=meta)
         return JSONAPIResponse(
             content=data,
             *args, **kwargs,
@@ -429,23 +535,30 @@ class BaseRelationshipResource:
                 'Cannot register a relationship resource if the `parent_resource` does not specify a `type_`.'
             )
 
-        parent_name = cls.parent_resource.register_as or cls.parent_resource.type_
-
-        # find the parent mount and append the new Route to it
-        for route in app.routes:
-            if isinstance(route, Mount):
-                if getattr(route, 'name', None) == parent_name:
-                    route.routes.append(
-                        Route(
-                            name=cls.relationship_name,
-                            path='/{{parent_id:{}}}/relationships/{}'.format(
-                                cls.parent_resource.id_mask,
-                                cls.relationship_name
-                            ),
-                            endpoint=cls.handle_request,
-                            methods=['GET', 'POST', 'PATCH', 'DELETE'],
-                        )
-                    )
-                    break
-        else:
+        if not getattr(cls.parent_resource, 'mount', None):
             raise Exception('Parent resource should be registered first.')
+
+        name = f'relationships-{cls.relationship_name}'
+        cls.parent_resource.mount.routes.append(
+            Route(
+                name=name,
+                path='/{{parent_id:{}}}/relationships/{}'.format(
+                    cls.parent_resource.id_mask,
+                    cls.relationship_name
+                ),
+                endpoint=cls.handle_request,
+                methods=['GET', 'POST', 'PATCH', 'DELETE'],
+            )
+        )
+
+
+def _partial(*args, **kwargs):
+    """
+    This is a temporary partial, since we cannot use functools.partial with Starlette due to asyncio bugs.
+    https://github.com/encode/starlette/pull/984
+    """
+    def outer(f):
+        async def inner(request: Request):
+            return await f(request, *args, **kwargs)
+        return inner
+    return outer
