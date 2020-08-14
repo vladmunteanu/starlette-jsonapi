@@ -1,38 +1,40 @@
-from starlette_jsonapi.pagination import BasePaginator
+from math import ceil
+from typing import Dict, Sequence
+
+from starlette_jsonapi.pagination import BasePageNumberPaginator
 
 
-class PageNumberPaginator(BasePaginator):
-    page_param_name = 'number'
-    size_param_name = 'size'
-    default_size = 20
-    max_size = 100
+class PageNumberPaginator(BasePageNumberPaginator):
 
-    def validate_page_value(self, page):
-        if not page:
-            return 1
-        return int(page)
+    def slice_object_list(self, params: dict=None) -> Sequence:
+        data = self.data[(self.page_number-1) * self.page_size : self.page_number * self.page_size]
+        return data
 
-    def slice_object_list(self, page, size):
-        page = page - 1
-        objects = self.object_list[(page*size):(page+1)*size]
-        return objects
+    def _create_pagination_link(self, page_number, page_size):
+        params = {
+            f'page[{self.page_number_param}]': page_number,
+            f'page[{self.page_size_param}]': page_size
+        }
+        return str(self.request.url.replace_query_params(**params))
 
-    def has_next(self):
-        return self.current_page < self.total_page_count
+    def generate_pagination_links(self, params: dict=None) -> Dict[str, str]:
+        links = dict(first=None, next=None, prev=None, last=None)
+        page_count = ceil(len(self.data)/self.page_size)
 
-    def has_previous(self):
-        return self.current_page > 1
+        # first
+        links['first'] = self._create_pagination_link(page_number=1, page_size=self.page_size)
 
-    def get_next_link(self, request):
-        return self.create_pagination_link(request, self.current_page+1)
+        # last
+        links['last'] = self._create_pagination_link(page_number=page_count, page_size=self.page_size)
 
-    def get_previous_link(self, request):
-        return self.create_pagination_link(request, self.current_page-1)
+        # next
+        has_next = self.page_number < page_count
+        if has_next:
+            links['next'] = self._create_pagination_link(page_number=self.page_number+1, page_size=self.page_size)
 
-    def get_last_link(self, request):
-        if self.current_page == 1 and not self.has_next():
-            last_page = self.current_page
-        else:
-            last_page = self.total_page_count
+        # previous
+        has_prev = self.page_number > 1
+        if has_prev:
+            links['prev'] = self._create_pagination_link(page_number=self.page_number-1, page_size=self.page_size)
 
-        return self.create_pagination_link(request, last_page)
+        return links

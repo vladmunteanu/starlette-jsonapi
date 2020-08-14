@@ -21,8 +21,3 @@ class ResourceNotFound(JSONAPIException):
             detail=detail if detail is not None else self.detail,
             errors=None,
         )
-
-
-class PaginationException(Exception):
-    # Pagination exception used to return pagination errors
-    pass

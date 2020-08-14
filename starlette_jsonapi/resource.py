@@ -144,12 +144,10 @@ class BaseResource:
         )
 
     async def paginate_request(self, object_list: Sequence) -> Pagination:
-        paginator = self.pagination_class(object_list)
-        page = self.request.query_params.get(paginator.page_param)
-        size = self.request.query_params.get(paginator.size_param, paginator.default_size)
+        assert self.pagination_class is not None
 
-        # apply pagination
-        pagination = paginator.paginate_request(self.request, page, size)
+        paginator = self.pagination_class(self.request, object_list)
+        pagination = paginator.get_pagination()
         return pagination
 
     @classmethod

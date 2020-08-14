@@ -5,7 +5,7 @@ from starlette.exceptions import HTTPException
 from starlette.requests import Request
 from starlette.responses import Response
 
-from starlette_jsonapi.exceptions import JSONAPIException, PaginationException
+from starlette_jsonapi.exceptions import JSONAPIException
 from starlette_jsonapi.responses import JSONAPIResponse
 
 
@@ -20,9 +20,6 @@ def serialize_error(exc: Exception) -> JSONAPIResponse:
     elif isinstance(exc, HTTPException):
         status_code = exc.status_code
         errors = [{'detail': exc.detail}]
-    elif isinstance(exc, PaginationException):
-        status_code = 400
-        errors = [{'detail': str(exc)}]
     else:
         status_code = 500
         errors = [{'detail': 'Internal server error'}]

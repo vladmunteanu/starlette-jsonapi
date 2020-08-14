@@ -1,6 +1,7 @@
 from asyncio import Future
+from math import ceil
 from unittest import mock
-from typing import Sequence
+from typing import Sequence, Dict, Optional
 
 import pytest
 from marshmallow_jsonapi import fields
@@ -9,127 +10,138 @@ from starlette.responses import Response
 from starlette.testclient import TestClient
 
 from starlette_jsonapi.resource import BaseResource
-from starlette_jsonapi.pagination import BasePaginator
+from starlette_jsonapi.pagination import (BasePaginator, BasePageNumberPaginator,
+                                          BaseCursorPaginator, BaseOffsetPaginator)
 from starlette_jsonapi.schema import JSONAPISchema
 
 
-def test_paginator_total_page_count():
-    # empty object list
-    paginator = BasePaginator(object_list=[])
-    assert paginator.total_page_count == 1
+def test_process_query_params_called_on_init():
+    paginator = BasePaginator(data=[], request=mock.MagicMock())
+    assert paginator.process_query_params() is None
 
-    # populated object list
-    paginator = BasePaginator(object_list=list(range(4)))
-    paginator.page_size = 2
-    assert paginator.total_page_count == 2
-
-    # inexact division
-    paginator = BasePaginator(object_list=list(range(5)))
-    paginator.page_size = 2
-    assert paginator.total_page_count == 3
+    process_query_params_mock = mock.MagicMock()
+    with mock.patch.object(BasePaginator, 'process_query_params', process_query_params_mock):
+        paginator = BasePaginator(data=[], request=mock.MagicMock())
+        assert process_query_params_mock.called
 
 
-def test_paginator_unimplemented_methods_throw_exceptions():
+def test_unimplemented_slice_throws_error():
     class TPaginator(BasePaginator):
         pass
-    paginator = TPaginator(object_list=[])
 
-    with pytest.raises(Exception) as exc:
-        paginator.slice_object_list(page=1, size=2)
-    assert str(exc.value) == '`slice_object_list` method not implemented'
+    paginator = TPaginator(data=[], request=mock.MagicMock())
+    with pytest.raises(NotImplementedError):
+        paginator.get_pagination()
 
-    with pytest.raises(Exception) as exc:
-        paginator.has_next()
-    assert str(exc.value) == '`has_next()` must be implemented to generate pagination links'
 
-    with pytest.raises(Exception) as exc:
-        paginator.has_previous()
-    assert str(exc.value) == '`has_previous()` must be implemented to generate pagination links'
+def test_unimplemented_generate_pagination_links():
+    class TPaginator(BasePaginator):
+        def slice_object_list(self, params: dict = None) -> Sequence:
+            return self.data
 
+    paginator = TPaginator(data=[1, 2, 3], request=mock.MagicMock())
+    data, links = paginator.get_pagination()
+    assert links == {}
+
+
+def test_base_page_number_paginator_process_query_params():
+    # test initialization on specified values
     request = mock.MagicMock()
-    with pytest.raises(Exception) as exc:
-        paginator.get_next_link(request)
-    assert str(exc.value) == '`get_next_link()` must be implemented to generate pagination links'
+    request.query_params = {'page[number]': 1, 'page[size]': 1}
+    paginator = BasePageNumberPaginator(data=[], request=request)
 
-    with pytest.raises(Exception) as exc:
-        paginator.get_previous_link(request)
-    assert str(exc.value) == '`get_previous_link()` must be implemented to generate pagination links'
+    assert paginator.page_number == 1
+    assert paginator.page_size == 1
 
-    with pytest.raises(Exception) as exc:
-        paginator.get_last_link(request)
-    assert str(exc.value) == '`get_last_link()` must be implemented to generate pagination links'
+    # test initialization for default values
+    request = mock.MagicMock()
+    request.query_params = {}
+    paginator = BasePageNumberPaginator(data=[], request=request)
 
-
-def test_paginator_validate_page_size_value():
-    paginator = BasePaginator(object_list=[])
-    paginator.size_param_name = 'size'
-    paginator.max_size = 4
-
-    # string value
-    with pytest.raises(Exception) as exc:
-        paginator.validate_page_size_value('test')
-    assert str(exc.value) == 'page[size] must be a positive integer; got test'
-
-    # null value
-    with pytest.raises(Exception) as exc:
-        paginator.validate_page_size_value(None)
-    assert str(exc.value) == 'page[size] must be a positive integer; got None'
-
-    # negative integer value
-    with pytest.raises(Exception) as exc:
-        paginator.validate_page_size_value(-1)
-    assert str(exc.value) == 'page[size] must be a positive integer; got -1'
-
-    # max size restriction
-    assert paginator.validate_page_size_value(5) == 4
+    assert paginator.page_number == paginator.default_page_number
+    assert paginator.page_size == paginator.default_page_size
 
 
-def test_paginator_validate_page_value():
-    paginator = BasePaginator(object_list=[])
-    assert paginator.validate_page_value(1) == '1'
+def test_base_offset_paginator_process_query_params():
+    # test initialization on specified values
+    request = mock.MagicMock()
+    request.query_params = {'page[offset]': 1, 'page[size]': 1}
+    paginator = BaseOffsetPaginator(data=[], request=request)
+
+    assert paginator.page_offset == 1
+    assert paginator.page_size == 1
+
+    # test initialization for default values
+    request = mock.MagicMock()
+    request.query_params = {}
+    paginator = BaseOffsetPaginator(data=[], request=request)
+
+    assert paginator.page_offset == paginator.default_page_offset
+    assert paginator.page_size == paginator.default_page_size
+
+
+def test_base_curor_paginator_process_query_params():
+    # test initialization on specified values
+    request = mock.MagicMock()
+    request.query_params = {'page[after]': 2, 'page[before]': 4, 'page[size]': 1}
+    paginator = BaseCursorPaginator(data=[], request=request)
+
+    assert paginator.page_before == 4
+    assert paginator.page_after == 2
+    assert paginator.page_size == 1
+
+    # test initialization for default values
+    request = mock.MagicMock()
+    request.query_params = {}
+    paginator = BaseCursorPaginator(data=[], request=request)
+
+    assert paginator.page_before == paginator.default_page_before
+    assert paginator.page_after == paginator.default_page_after
+    assert paginator.page_size == paginator.default_page_size
 
 
 @pytest.fixture()
 def pagination_app(app: Starlette):
-    class TPaginator(BasePaginator):
-        page_param_name = 'number'
-        size_param_name = 'size'
-        default_size = 2
-        max_size = 3
+    class TPaginator(BasePageNumberPaginator):
+        default_page_size = 2
 
-        def __init__(self, object_list: Sequence):
-            super(TPaginator, self).__init__(object_list)
-            self.current_page: int = 0
+        def process_query_params(self):
+            super(TPaginator, self).process_query_params()
+            if self.page_size == 0:
+                self.page_size = self.default_page_size
 
-        def validate_page_value(self, page) -> int:
-            if not page:
-                return 1
-            return int(page)
+        def slice_object_list(self, params: dict = None) -> Sequence:
+            data = self.data[(self.page_number - 1) * self.page_size: self.page_number * self.page_size]
+            return data
 
-        def slice_object_list(self, page, size) -> Sequence:
-            page = page - 1
-            objects = self.object_list[(page * size):(page + 1) * size]
-            return objects
+        def _create_pagination_link(self, page_number: int, page_size: int) -> str:
+            params = {
+                f'page[{self.page_number_param}]': page_number,
+                f'page[{self.page_size_param}]': page_size
+            }
+            return str(self.request.url.replace_query_params(**params))
 
-        def has_next(self):
-            return self.current_page < self.total_page_count
+        def generate_pagination_links(self, params: dict = None) -> Dict[str, Optional[str]]:
+            links = dict(first=None, next=None, prev=None, last=None)  # type: Dict[str, Optional[str]]
+            page_count = ceil(len(self.data) / self.page_size)
 
-        def has_previous(self):
-            return self.current_page > 1
+            # first
+            links['first'] = self._create_pagination_link(page_number=1, page_size=self.page_size)
 
-        def get_next_link(self, request):
-            return self.create_pagination_link(request, self.current_page + 1)
+            # last
+            links['last'] = self._create_pagination_link(page_number=page_count, page_size=self.page_size)
 
-        def get_previous_link(self, request):
-            return self.create_pagination_link(request, self.current_page - 1)
+            # next
+            has_next = self.page_number < page_count
+            if has_next:
+                links['next'] = self._create_pagination_link(page_number=self.page_number + 1, page_size=self.page_size)
 
-        def get_last_link(self, request):
-            if self.current_page == 1 and not self.has_next():
-                last_page = self.current_page
-            else:
-                last_page = self.total_page_count
+            # previous
+            has_prev = self.page_number > 1
+            if has_prev:
+                links['prev'] = self._create_pagination_link(page_number=self.page_number - 1, page_size=self.page_size)
 
-            return self.create_pagination_link(request, last_page)
+            return links
 
     class TSchema(JSONAPISchema):
         id = fields.Str(dump_only=True)
@@ -237,7 +249,7 @@ def test_specified_params(pagination_app: Starlette):
             },
         ],
         'links': {
-            'first': 'http://testserver/test-resource/?page%5Bsize%5D=1',
+            'first': 'http://testserver/test-resource/?page%5Bnumber%5D=1&page%5Bsize%5D=1',
             'next': 'http://testserver/test-resource/?page%5Bnumber%5D=2&page%5Bsize%5D=1',
             'prev': None,
             'last': 'http://testserver/test-resource/?page%5Bnumber%5D=4&page%5Bsize%5D=1',
@@ -258,7 +270,7 @@ def test_specified_params(pagination_app: Starlette):
             },
         ],
         'links': {
-            'first': 'http://testserver/test-resource/?page%5Bsize%5D=1',
+            'first': 'http://testserver/test-resource/?page%5Bnumber%5D=1&page%5Bsize%5D=1',
             'next': 'http://testserver/test-resource/?page%5Bnumber%5D=4&page%5Bsize%5D=1',
             'prev': 'http://testserver/test-resource/?page%5Bnumber%5D=2&page%5Bsize%5D=1',
             'last': 'http://testserver/test-resource/?page%5Bnumber%5D=4&page%5Bsize%5D=1',
@@ -266,10 +278,9 @@ def test_specified_params(pagination_app: Starlette):
     }
 
 
-def test_enforced_size_values(pagination_app: Starlette):
+def test_default_value_enforcement(pagination_app: Starlette):
     test_client = TestClient(app=pagination_app)
 
-    # default size
     rv = test_client.get('/test-resource/')
     assert rv.status_code == 200
     assert rv.json() == {
@@ -290,81 +301,9 @@ def test_enforced_size_values(pagination_app: Starlette):
             }
         ],
         'links': {
-            'first': 'http://testserver/test-resource/?page%5Bsize%5D=2',
+            'first': 'http://testserver/test-resource/?page%5Bnumber%5D=1&page%5Bsize%5D=2',
             'next': 'http://testserver/test-resource/?page%5Bnumber%5D=2&page%5Bsize%5D=2',
             'prev': None,
             'last': 'http://testserver/test-resource/?page%5Bnumber%5D=2&page%5Bsize%5D=2',
         }
-    }
-
-    # max size restriction
-    rv = test_client.get('/test-resource/?page[number]=1&page[size]=4')
-    assert rv.status_code == 200
-    assert rv.json() == {
-        'data': [
-            {
-                'id': '1',
-                'type': 'test-resource',
-                'attributes': {
-                    'name': 'foo'
-                }
-            },
-            {
-                'id': '2',
-                'type': 'test-resource',
-                'attributes': {
-                    'name': 'foo'
-                }
-            },
-            {
-                'id': '3',
-                'type': 'test-resource',
-                'attributes': {
-                    'name': 'foo'
-                }
-            },
-        ],
-        'links': {
-            'first': 'http://testserver/test-resource/?page%5Bsize%5D=3',
-            'next': 'http://testserver/test-resource/?page%5Bnumber%5D=2&page%5Bsize%5D=3',
-            'prev': None,
-            'last': 'http://testserver/test-resource/?page%5Bnumber%5D=2&page%5Bsize%5D=3',
-        }
-    }
-
-
-def test_parameter_error(pagination_app: Starlette):
-    test_client = TestClient(app=pagination_app)
-
-    # zero value
-    rv = test_client.get('/test-resource/?page[size]=0')
-    assert rv.status_code == 400
-    assert rv.json() == {
-        'errors': [
-            {
-                'detail': 'page[size] must be a positive integer; got 0'
-            }
-        ]
-    }
-
-    # negative value
-    rv = test_client.get('/test-resource/?page[size]=-1')
-    assert rv.status_code == 400
-    assert rv.json() == {
-        'errors': [
-            {
-                'detail': 'page[size] must be a positive integer; got -1'
-            }
-        ]
-    }
-
-    # string value
-    rv = test_client.get('/test-resource/?page[size]=test')
-    assert rv.status_code == 400
-    assert rv.json() == {
-        'errors': [
-            {
-                'detail': 'page[size] must be a positive integer; got test'
-            }
-        ]
     }
