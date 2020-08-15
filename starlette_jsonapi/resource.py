@@ -411,16 +411,16 @@ class BaseRelationshipResource:
     def __init__(self, request: Request, *args, **kwargs) -> None:
         self.request = request
 
-    async def post(self, parent_id: str, *args, **kwargs) -> Response:
+    async def post(self, parent_id: Any, *args, **kwargs) -> Response:
         raise JSONAPIException(status_code=405)
 
-    async def get(self, parent_id: str, *args, **kwargs) -> Response:
+    async def get(self, parent_id: Any, *args, **kwargs) -> Response:
         raise JSONAPIException(status_code=405)
 
-    async def patch(self, parent_id: str, *args, **kwargs) -> Response:
+    async def patch(self, parent_id: Any, *args, **kwargs) -> Response:
         raise JSONAPIException(status_code=405)
 
-    async def delete(self, parent_id: str, *args, **kwargs) -> Response:
+    async def delete(self, parent_id: Any, *args, **kwargs) -> Response:
         raise JSONAPIException(status_code=405)
 
     def _get_relationship_field(self) -> JSONAPIRelationship:
