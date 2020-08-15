@@ -25,8 +25,10 @@ We are not going to bother with an actual ORM right now, so let's start by defin
 
 1. Defining serialization / deserialization
 -------------------------------------------
-We then define how our resources should serialize / deserialize, by subclassing ``JSONAPISchema``,
-which is an extended version of a `marshmallow-jsonapi`_ Schema, with support for `starlette`_ route generation.
+We then define how our resources should serialize / deserialize,
+by subclassing :class:`starlette_jsonapi.schema.JSONAPISchema`,
+which is an extended version of a `marshmallow-jsonapi`_ Schema,
+with support for `starlette`_ route generation.
 
 Let's take Article as an example:
 
@@ -92,7 +94,8 @@ And serializing ``Article(id=1, title='Foo', content='Bar', author=Author(id=11,
 2. Implementing resource handlers
 ---------------------------------
 We haven't exposed anything through the API yet, so we will look at that next.
-We'll stick with Article and create the ``articles`` resource.
+We'll stick with Article and create the ``articles`` resource,
+by subclassing :class:`starlette_jsonapi.resource.BaseResource`.
 
 .. code-block:: python
 
@@ -136,7 +139,7 @@ compound documents or related resource.
 3. Registering resource routes
 ------------------------------
 Before we jump to more advanced features, let's look at how we register
-the above resource in the Starlette Routing mechanism.
+the above resource in the Starlette routing mechanism.
 
 .. code-block:: python
 
@@ -204,7 +207,7 @@ First, we'll add links by using the route generation available in Starlette
 
 Once the ``author`` relationship is configured with
 ``related_resource``, ``related_route`` and ``related_route_kwargs``,
-we can implement the ``get_related`` handler on ``ArticlesResource``:
+we can implement the :meth:`starlette_jsonapi.resource.BaseResource.get_related` handler on ``ArticlesResource``:
 
 .. code-block:: python
 
@@ -228,8 +231,8 @@ we can implement the ``get_related`` handler on ``ArticlesResource``:
 
 5. Compound documents
 ---------------------
-That takes care of related resources, but what about compound documents through ``?include=`` requests ?
-`starlette-jsonapi` helps you with that through the ``prepare_relations`` handler.
+That takes care of related resources, but what about compound documents through ``?include=`` requests?
+`starlette-jsonapi` helps you with that through the :meth:`starlette_jsonapi.resource.BaseResource.prepare_relations` handler.
 For our example, we just need to override the default implementation of ``prepare_relations`` to allow include requests.
 That's because the relationship is on the object since we're using plain objects.
 However, async ORMs generally can't implement lazy evaluation,
@@ -283,7 +286,7 @@ a base resource for writing relationship resources.
             ....
 
 We can also render the link associated to the above relationship resource by passing
-``self_route`` and ``self_route_kwargs`` to the ``JSONAPIRelationship`` constructor.
+``self_route`` and ``self_route_kwargs`` to the :class:`starlette_jsonapi.fields.JSONAPIRelationship` constructor.
 
 .. code-block:: python
 
@@ -338,4 +341,3 @@ In the end, our app will have the following routes registered:
 .. _marshmallow-jsonapi: https://marshmallow-jsonapi.readthedocs.io/
 .. _marshmallow: https://marshmallow.readthedocs.io/
 .. _starlette-jsonapi: https://pypi.org/project/starlette-jsonapi/
-

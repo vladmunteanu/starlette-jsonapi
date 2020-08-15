@@ -46,3 +46,4 @@ Todo
    getting_started
    tutorial
    how_to
+   API Reference <api_reference/modules>
