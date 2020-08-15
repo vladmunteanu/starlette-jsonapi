@@ -11,10 +11,12 @@ import sphinx_rtd_theme
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
-# import sys
-# sys.path.insert(0, os.path.abspath('.'))
+import os
+import sys
 
+sys.path.insert(0, os.path.abspath('../..'))
+
+import starlette_jsonapi
 
 # -- Project information -----------------------------------------------------
 
@@ -23,7 +25,7 @@ copyright = '2020, Vlad Stefan Munteanu'
 author = 'Vlad Stefan Munteanu'
 
 # The full version, including alpha/beta/rc tags
-release = '1.2.0'
+release = starlette_jsonapi.__version__
 
 
 # -- General configuration ---------------------------------------------------
