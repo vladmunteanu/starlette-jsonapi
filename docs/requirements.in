@@ -1,3 +1,7 @@
+starlette
+marshmallow
+marshmallow-jsonapi
+
 # documentation
 sphinx
 sphinx-rtd-theme

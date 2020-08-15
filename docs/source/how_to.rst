@@ -82,8 +82,9 @@ Requests with malformed IDS will likely result in 404 errors.
 Top level meta objects
 ----------------------
 To include a ``meta`` object (`documentation <https://jsonapi.org/format/#document-meta>`_) in the top level
-json:api response, you can pass a dictionary ``meta`` argument when calling ``to_response``,
-in a primary, or relationship resource:
+json:api response, you can pass a dictionary ``meta`` argument when calling
+:meth:`starlette_jsonapi.resource.BaseResource.to_response`,
+or :meth:`starlette_jsonapi.resource.BaseRelationshipResource.to_response`:
 
 .. code-block:: python
 
