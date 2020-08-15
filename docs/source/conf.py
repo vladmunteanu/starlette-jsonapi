@@ -26,6 +26,7 @@ author = 'Vlad Stefan Munteanu'
 
 # The full version, including alpha/beta/rc tags
 release = starlette_jsonapi.__version__
+version = starlette_jsonapi.__version__
 
 
 # -- General configuration ---------------------------------------------------
