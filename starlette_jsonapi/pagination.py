@@ -63,10 +63,17 @@ class BasePageNumberPaginator(BasePaginator):
     default_page_size = 50
 
     def process_query_params(self):
-        self.page_number = int(self.request.query_params.get(f'page[{self.page_number_param}]',
-                                                             self.default_page_number))
-        self.page_size = int(self.request.query_params.get(f'page[{self.page_size_param}]',
-                                                           self.default_page_size))
+        page_number = self.request.query_params.get(
+            f'page[{self.page_number_param}]',
+            self.default_page_number
+        )
+        page_size = self.request.query_params.get(
+            f'page[{self.page_size_param}]',
+            self.default_page_size
+        )
+
+        self.page_number = int(page_number)
+        self.page_size = int(page_size)
 
 
 class BaseOffsetPaginator(BasePaginator):
@@ -77,10 +84,17 @@ class BaseOffsetPaginator(BasePaginator):
     default_page_size = 50
 
     def process_query_params(self):
-        self.page_offset = int(self.request.query_params.get(f'page[{self.page_offset_param}]',
-                                                             self.default_page_offset))
-        self.page_size = int(self.request.query_params.get(f'page[{self.page_size_param}]',
-                                                           self.default_page_size))
+        page_offset = self.request.query_params.get(
+            f'page[{self.page_offset_param}]',
+            self.default_page_offset
+        )
+        page_size = self.request.query_params.get(
+            f'page[{self.page_size_param}]',
+            self.default_page_size
+        )
+
+        self.page_offset = int(page_offset)
+        self.page_size = int(page_size)
 
 
 class BaseCursorPaginator(BasePaginator):
@@ -93,9 +107,17 @@ class BaseCursorPaginator(BasePaginator):
     default_page_size = 50
 
     def process_query_params(self):
-        self.page_before = self.request.query_params.get(f'page[{self.page_before_param}]',
-                                                         self.default_page_before)
-        self.page_after = self.request.query_params.get(f'page[{self.page_after_param}]',
-                                                        self.default_page_after)
-        self.page_size = int(self.request.query_params.get(f'page[{self.page_size_param}]',
-                                                           self.default_page_size))
+        page_size = self.request.query_params.get(
+            f'page[{self.page_size_param}]',
+            self.default_page_size
+        )
+
+        self.page_size = int(page_size)
+        self.page_before = self.request.query_params.get(
+            f'page[{self.page_before_param}]',
+            self.default_page_before
+        )
+        self.page_after = self.request.query_params.get(
+            f'page[{self.page_after_param}]',
+            self.default_page_after
+        )
