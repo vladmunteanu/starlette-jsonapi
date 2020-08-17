@@ -200,8 +200,6 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         )
 
     async def paginate_request(self, object_list: Sequence) -> Pagination:
-        assert self.pagination_class is not None
-
         paginator = self.pagination_class(self.request, object_list)
         pagination = paginator.get_pagination()
         return pagination
