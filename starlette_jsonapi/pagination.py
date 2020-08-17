@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Sequence, NamedTuple, Optional
+from typing import Dict, Sequence, NamedTuple, Optional, Union
 
 from starlette.requests import Request
 
@@ -11,25 +11,16 @@ class Pagination(NamedTuple):
     links: Dict[str, Optional[str]]
 
 
-class BasePaginator:
+class BasePagination:
     """
     Base class used to easily add pagination support for resources
     This class is agnostic about the pagination strategy, and can be effectively
     subclassed to accommodate for any variant.
 
-    Typical implementations will require overriding the following methods:
-        - slice_object_list
-        - has_next
-        - has_previous
-        - get_next_link
-        - get_previous_link
-        - get_last_link
-
-    While not strictly required, it is HIGHLY recommended that total_result_count()
-    is overridden to optimize database queries.
-
-    It is also recommended to override validate_page_value to ensure value sanity checks
-    for this parameter, and raise PaginationException to properly generate an API error
+    Implementation will require overriding the following methods:
+        - slice_data
+        - process_query_params
+        - generate_pagination_links
     """
     def __init__(self, request: Request, data: Sequence):
         self.data = data
@@ -37,9 +28,13 @@ class BasePaginator:
         self.process_query_params()
 
     def process_query_params(self):
+        """
+        Parse the request to store the pagination parameters for later usage
+        Should be implemented in subclasses
+        """
         return
 
-    def slice_object_list(self, params: dict = None) -> Sequence:
+    def slice_data(self, params: dict = None) -> Sequence:
         """
         This method should be implemented in subclasses in order to accommodate for different ORM's
         and optimize the database operations
@@ -47,15 +42,27 @@ class BasePaginator:
         raise NotImplementedError()
 
     def get_pagination(self, params: dict = None) -> Pagination:
-        data = self.slice_object_list(params)
+        """Slice the queryset according to the pagination rules, and create pagination links"""
+        data = self.slice_data(params)
         links = self.generate_pagination_links(params)
         return Pagination(data=data, links=links)
 
     def generate_pagination_links(self, params: dict = None) -> Dict[str, Optional[str]]:
+        """Create a dict of pagination helper links"""
         return {}
 
 
-class BasePageNumberPaginator(BasePaginator):
+class BasePageNumberPagination(BasePagination):
+    """
+    Base class for accommodating the page number pagination strategy using the standard parameters
+    under the JSON:API format
+        - page[number]
+        - page[size]
+
+    Implementation will require overriding the following methods:
+        - slice_data
+        - generate_pagination_links
+    """
     page_number_param = 'number'
     page_size_param = 'size'
 
@@ -63,6 +70,7 @@ class BasePageNumberPaginator(BasePaginator):
     default_page_size = 50
 
     def process_query_params(self):
+        """Extract the page number and page size from the query parameters"""
         page_number = self.request.query_params.get(
             f'page[{self.page_number_param}]',
             self.default_page_number
@@ -75,8 +83,26 @@ class BasePageNumberPaginator(BasePaginator):
         self.page_number = int(page_number)
         self.page_size = int(page_size)
 
+    def create_pagination_link(self, page_number: int, page_size: int) -> str:
+        """Helper method used to easily generate links used in pagination"""
+        params = {
+            f'page[{self.page_number_param}]': page_number,
+            f'page[{self.page_size_param}]': page_size
+        }
+        return str(self.request.url.replace_query_params(**params))
 
-class BaseOffsetPaginator(BasePaginator):
+
+class BaseOffsetPagination(BasePagination):
+    """
+    Base class for accommodating the offset pagination strategy using the standard parameters
+    under the JSON:API format
+        - page[offset]
+        - page[size]
+
+    Implementation will require overriding the following methods:
+        - slice_data
+        - generate_pagination_links
+    """
     page_offset_param = 'offset'
     page_size_param = 'size'
 
@@ -84,6 +110,7 @@ class BaseOffsetPaginator(BasePaginator):
     default_page_size = 50
 
     def process_query_params(self):
+        """Extract the page offset and page size from the query parameters"""
         page_offset = self.request.query_params.get(
             f'page[{self.page_offset_param}]',
             self.default_page_offset
@@ -96,28 +123,62 @@ class BaseOffsetPaginator(BasePaginator):
         self.page_offset = int(page_offset)
         self.page_size = int(page_size)
 
+    def create_pagination_link(self, page_offset: int, page_size: int) -> str:
+        """Helper method used to easily generate links used in pagination"""
+        params = {
+            f'page[{self.page_offset_param}]': page_offset,
+            f'page[{self.page_size_param}]': page_size
+        }
+        return str(self.request.url.replace_query_params(**params))
 
-class BaseCursorPaginator(BasePaginator):
-    page_before_param = 'before'
+
+class BaseCursorPagination(BasePagination):
+    """
+    Base class for accommodating the cursor pagination strategy using the standard parameters
+    under the JSON:API format
+        - page[after]
+        - page[before]
+        - page[size]
+
+    Implementation will require overriding the following methods:
+        - slice_data
+        - generate_pagination_links
+    """
     page_after_param = 'after'
+    page_before_param = 'before'
     page_size_param = 'size'
 
-    default_page_before = None
     default_page_after = 0
+    default_page_before = None
     default_page_size = 50
 
     def process_query_params(self):
+        """Extract the cursor positions and page size from the query parameters"""
         page_size = self.request.query_params.get(
             f'page[{self.page_size_param}]',
             self.default_page_size
         )
 
         self.page_size = int(page_size)
-        self.page_before = self.request.query_params.get(
-            f'page[{self.page_before_param}]',
-            self.default_page_before
-        )
         self.page_after = self.request.query_params.get(
             f'page[{self.page_after_param}]',
             self.default_page_after
         )
+        self.page_before = self.request.query_params.get(
+            f'page[{self.page_before_param}]',
+            self.default_page_before
+        )
+
+    def create_pagination_link(self, page_size: int,
+                               page_after: Union[str, int, None] = None,
+                               page_before: Union[str, int, None] = None) -> str:
+        """Helper method used to easily generate links used in pagination"""
+        params = {
+            f'page[{self.page_size_param}]': page_size
+        }  # type: Dict[str, Union[str, int]]
+        if page_after is not None:
+            params[f'page[{self.page_after_param}]'] = page_after
+        if page_before is not None:
+            params[f'page[{self.page_before_param}]'] = page_before
+
+        return str(self.request.url.replace_query_params(**params))

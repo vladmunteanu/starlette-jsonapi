@@ -12,7 +12,7 @@ from starlette_jsonapi.fields import JSONAPIRelationship
 from starlette_jsonapi.meta import RegisteredResourceMeta
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
-from starlette_jsonapi.pagination import BasePaginator, Pagination
+from starlette_jsonapi.pagination import BasePagination, Pagination
 from starlette_jsonapi.utils import (
     parse_included_params,
     parse_sparse_fields_params, filter_sparse_fields,
@@ -47,8 +47,8 @@ class BaseResource(metaclass=RegisteredResourceMeta):
     # 'str', 'int', 'float', 'uuid', 'path'
     id_mask: str = 'str'
 
-    # Paginator class, subclass of BasePaginator
-    pagination_class: Optional[Type[BasePaginator]] = None
+    # Pagination class, subclass of BasePagination
+    pagination_class: Optional[Type[BasePagination]] = None
 
     # Optional, by default this will equal `type_` and will be used as the `mount` name.
     # Impacts the result of `url_path_for`, so it can be used to support multiple resource versions.
@@ -142,7 +142,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         Additional args and kwargs are passed to the `marshmallow` based Schema.
         """
         links = None
-        if self.pagination_class and paginate:
+        if paginate:
             data, links = await self.paginate_request(data)
 
         included_relations = await self._prepare_included(data=data, many=many)

@@ -6,49 +6,50 @@ from typing import Sequence, Dict, Optional
 import pytest
 from marshmallow_jsonapi import fields
 from starlette.applications import Starlette
+from starlette.requests import URL
 from starlette.responses import Response
 from starlette.testclient import TestClient
 
 from starlette_jsonapi.resource import BaseResource
-from starlette_jsonapi.pagination import (BasePaginator, BasePageNumberPaginator,
-                                          BaseCursorPaginator, BaseOffsetPaginator)
+from starlette_jsonapi.pagination import (BasePagination, BasePageNumberPagination,
+                                          BaseCursorPagination, BaseOffsetPagination)
 from starlette_jsonapi.schema import JSONAPISchema
 
 
 def test_process_query_params_called_on_init():
-    paginator = BasePaginator(data=[], request=mock.MagicMock())
+    paginator = BasePagination(request=mock.MagicMock(), data=[])
     assert paginator.process_query_params() is None
 
     process_query_params_mock = mock.MagicMock()
-    with mock.patch.object(BasePaginator, 'process_query_params', process_query_params_mock):
-        paginator = BasePaginator(data=[], request=mock.MagicMock())
+    with mock.patch.object(BasePagination, 'process_query_params', process_query_params_mock):
+        BasePagination(request=mock.MagicMock(), data=[])
         assert process_query_params_mock.called
 
 
 def test_unimplemented_slice_throws_error():
-    class TPaginator(BasePaginator):
+    class TPagination(BasePagination):
         pass
 
-    paginator = TPaginator(data=[], request=mock.MagicMock())
+    paginator = TPagination(request=mock.MagicMock(), data=[])
     with pytest.raises(NotImplementedError):
         paginator.get_pagination()
 
 
 def test_unimplemented_generate_pagination_links():
-    class TPaginator(BasePaginator):
-        def slice_object_list(self, params: dict = None) -> Sequence:
+    class TPagination(BasePagination):
+        def slice_data(self, params: dict = None) -> Sequence:
             return self.data
 
-    paginator = TPaginator(data=[1, 2, 3], request=mock.MagicMock())
+    paginator = TPagination(request=mock.MagicMock(), data=[1, 2, 3])
     data, links = paginator.get_pagination()
     assert links == {}
 
 
-def test_base_page_number_paginator_process_query_params():
+def test_base_page_number_pagination_process_query_params():
     # test initialization on specified values
     request = mock.MagicMock()
     request.query_params = {'page[number]': 1, 'page[size]': 1}
-    paginator = BasePageNumberPaginator(data=[], request=request)
+    paginator = BasePageNumberPagination(request=request, data=[])
 
     assert paginator.page_number == 1
     assert paginator.page_size == 1
@@ -56,17 +57,28 @@ def test_base_page_number_paginator_process_query_params():
     # test initialization for default values
     request = mock.MagicMock()
     request.query_params = {}
-    paginator = BasePageNumberPaginator(data=[], request=request)
+    paginator = BasePageNumberPagination(request=request, data=[])
 
     assert paginator.page_number == paginator.default_page_number
     assert paginator.page_size == paginator.default_page_size
 
 
-def test_base_offset_paginator_process_query_params():
+def test_base_page_number_pagination_create_pagination_link():
+    from starlette.requests import URL
+    url = URL('http://testserver/test-resource')
+    request = mock.MagicMock()
+    request.url = url
+
+    paginator = BasePageNumberPagination(request=request, data=[])
+    link = paginator.create_pagination_link(page_number=2, page_size=4)
+    assert link == 'http://testserver/test-resource?page%5Bnumber%5D=2&page%5Bsize%5D=4'
+
+
+def test_base_offset_pagination_process_query_params():
     # test initialization on specified values
     request = mock.MagicMock()
     request.query_params = {'page[offset]': 1, 'page[size]': 1}
-    paginator = BaseOffsetPaginator(data=[], request=request)
+    paginator = BaseOffsetPagination(request=request, data=[])
 
     assert paginator.page_offset == 1
     assert paginator.page_size == 1
@@ -74,17 +86,27 @@ def test_base_offset_paginator_process_query_params():
     # test initialization for default values
     request = mock.MagicMock()
     request.query_params = {}
-    paginator = BaseOffsetPaginator(data=[], request=request)
+    paginator = BaseOffsetPagination(request=request, data=[])
 
     assert paginator.page_offset == paginator.default_page_offset
     assert paginator.page_size == paginator.default_page_size
 
 
-def test_base_curor_paginator_process_query_params():
+def test_base_offset_pagination_create_pagination_link():
+    url = URL('http://testserver/test-resource')
+    request = mock.MagicMock()
+    request.url = url
+
+    paginator = BaseOffsetPagination(request=request, data=[])
+    link = paginator.create_pagination_link(page_offset=35, page_size=4)
+    assert link == 'http://testserver/test-resource?page%5Boffset%5D=35&page%5Bsize%5D=4'
+
+
+def test_base_cursor_pagination_process_query_params():
     # test initialization on specified values
     request = mock.MagicMock()
     request.query_params = {'page[after]': 2, 'page[before]': 4, 'page[size]': 1}
-    paginator = BaseCursorPaginator(data=[], request=request)
+    paginator = BaseCursorPagination(request=request, data=[])
 
     assert paginator.page_before == 4
     assert paginator.page_after == 2
@@ -93,53 +115,55 @@ def test_base_curor_paginator_process_query_params():
     # test initialization for default values
     request = mock.MagicMock()
     request.query_params = {}
-    paginator = BaseCursorPaginator(data=[], request=request)
+    paginator = BaseCursorPagination(request=request, data=[])
 
     assert paginator.page_before == paginator.default_page_before
     assert paginator.page_after == paginator.default_page_after
     assert paginator.page_size == paginator.default_page_size
 
 
+def test_base_cursor_pagination_create_pagination_link():
+    url = URL('http://testserver/test-resource')
+    request = mock.MagicMock()
+    request.url = url
+
+    paginator = BaseCursorPagination(request=request, data=[])
+    link = paginator.create_pagination_link(page_after=2, page_before=6, page_size=4)
+    assert link == 'http://testserver/test-resource?page%5Bsize%5D=4&page%5Bafter%5D=2&page%5Bbefore%5D=6'
+
+
+
 @pytest.fixture()
 def pagination_app(app: Starlette):
-    class TPaginator(BasePageNumberPaginator):
+    class TPagination(BasePageNumberPagination):
         default_page_size = 2
 
         def process_query_params(self):
-            super(TPaginator, self).process_query_params()
-            if self.page_size == 0:
-                self.page_size = self.default_page_size
+            super(TPagination, self).process_query_params()
 
-        def slice_object_list(self, params: dict = None) -> Sequence:
+        def slice_data(self, params: dict = None) -> Sequence:
             data = self.data[(self.page_number - 1) * self.page_size: self.page_number * self.page_size]
             return data
-
-        def _create_pagination_link(self, page_number: int, page_size: int) -> str:
-            params = {
-                f'page[{self.page_number_param}]': page_number,
-                f'page[{self.page_size_param}]': page_size
-            }
-            return str(self.request.url.replace_query_params(**params))
 
         def generate_pagination_links(self, params: dict = None) -> Dict[str, Optional[str]]:
             links = dict(first=None, next=None, prev=None, last=None)  # type: Dict[str, Optional[str]]
             page_count = ceil(len(self.data) / self.page_size)
 
             # first
-            links['first'] = self._create_pagination_link(page_number=1, page_size=self.page_size)
+            links['first'] = self.create_pagination_link(page_number=1, page_size=self.page_size)
 
             # last
-            links['last'] = self._create_pagination_link(page_number=page_count, page_size=self.page_size)
+            links['last'] = self.create_pagination_link(page_number=page_count, page_size=self.page_size)
 
             # next
             has_next = self.page_number < page_count
             if has_next:
-                links['next'] = self._create_pagination_link(page_number=self.page_number + 1, page_size=self.page_size)
+                links['next'] = self.create_pagination_link(page_number=self.page_number + 1, page_size=self.page_size)
 
             # previous
             has_prev = self.page_number > 1
             if has_prev:
-                links['prev'] = self._create_pagination_link(page_number=self.page_number - 1, page_size=self.page_size)
+                links['prev'] = self.create_pagination_link(page_number=self.page_number - 1, page_size=self.page_size)
 
             return links
 
@@ -153,7 +177,7 @@ def pagination_app(app: Starlette):
     class TResource(BaseResource):
         type_ = 'test-resource'
         schema = TSchema
-        pagination_class = TPaginator
+        pagination_class = TPagination
 
         async def get_all(self, *args, **kwargs) -> Response:
             data = [
