@@ -200,6 +200,8 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         )
 
     async def paginate_request(self, object_list: Sequence) -> Pagination:
+        if not self.pagination_class:
+            raise Exception('Pagination class must be defined to use pagination')
         paginator = self.pagination_class(self.request, object_list)
         pagination = paginator.get_pagination()
         return pagination

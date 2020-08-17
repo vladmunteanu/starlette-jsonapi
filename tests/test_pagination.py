@@ -1,7 +1,7 @@
 from asyncio import Future
 from math import ceil
 from unittest import mock
-from typing import Sequence, Dict, Optional
+from typing import Sequence, Dict, Optional, Type
 
 import pytest
 from marshmallow_jsonapi import fields
@@ -10,6 +10,7 @@ from starlette.requests import URL
 from starlette.responses import Response
 from starlette.testclient import TestClient
 
+from starlette_jsonapi import meta
 from starlette_jsonapi.resource import BaseResource
 from starlette_jsonapi.pagination import (BasePagination, BasePageNumberPagination,
                                           BaseCursorPagination, BaseOffsetPagination)
@@ -132,7 +133,6 @@ def test_base_cursor_pagination_create_pagination_link():
     assert link == 'http://testserver/test-resource?page%5Bsize%5D=4&page%5Bafter%5D=2&page%5Bbefore%5D=6'
 
 
-
 @pytest.fixture()
 def pagination_app(app: Starlette):
     class TPagination(BasePageNumberPagination):
@@ -231,6 +231,16 @@ def test_get_many_calls_pagination(pagination_app: Starlette):
                 'next': 'next'
             }
         }
+
+
+def test_get_many_without_pagination_class(pagination_app: Starlette):
+    resource = meta.registered_resources['TResource']  # type: Type[BaseResource]
+    resource.pagination_class = None
+    test_client = TestClient(app=pagination_app)
+
+    with pytest.raises(Exception) as exc:
+        test_client.get('/test-resource/')
+        assert str(exc.value) == 'Pagination class must be defined to use pagination'
 
 
 def test_incorrect_request_type(pagination_app: Starlette):
