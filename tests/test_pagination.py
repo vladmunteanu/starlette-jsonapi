@@ -1,9 +1,10 @@
 from asyncio import Future
 from math import ceil
-from unittest import mock
+from unittest.mock import MagicMock
 from typing import Sequence, Dict, Optional, Type
 
 import pytest
+from _pytest.monkeypatch import MonkeyPatch
 from marshmallow_jsonapi import fields
 from starlette.applications import Starlette
 from starlette.requests import URL
@@ -17,21 +18,21 @@ from starlette_jsonapi.pagination import (BasePagination, BasePageNumberPaginati
 from starlette_jsonapi.schema import JSONAPISchema
 
 
-def test_process_query_params_called_on_init():
-    paginator = BasePagination(request=mock.MagicMock(), data=[])
+def test_process_query_params_called_on_init(monkeypatch: MonkeyPatch):
+    paginator = BasePagination(request=MagicMock(), data=[])
     assert paginator.process_query_params() is None
 
-    process_query_params_mock = mock.MagicMock()
-    with mock.patch.object(BasePagination, 'process_query_params', process_query_params_mock):
-        BasePagination(request=mock.MagicMock(), data=[])
-        assert process_query_params_mock.called
+    process_query_params_mock = MagicMock()
+    monkeypatch.setattr(BasePagination, 'process_query_params', process_query_params_mock)
+    BasePagination(request=MagicMock(), data=[])
+    assert process_query_params_mock.called
 
 
 def test_unimplemented_slice_throws_error():
     class TPagination(BasePagination):
         pass
 
-    paginator = TPagination(request=mock.MagicMock(), data=[])
+    paginator = TPagination(request=MagicMock(), data=[])
     with pytest.raises(NotImplementedError):
         paginator.get_pagination()
 
@@ -41,14 +42,14 @@ def test_unimplemented_generate_pagination_links():
         def slice_data(self, params: dict = None) -> Sequence:
             return self.data
 
-    paginator = TPagination(request=mock.MagicMock(), data=[1, 2, 3])
+    paginator = TPagination(request=MagicMock(), data=[1, 2, 3])
     data, links = paginator.get_pagination()
     assert links == {}
 
 
 def test_base_page_number_pagination_process_query_params():
     # test initialization on specified values
-    request = mock.MagicMock()
+    request = MagicMock()
     request.query_params = {'page[number]': 1, 'page[size]': 1}
     paginator = BasePageNumberPagination(request=request, data=[])
 
@@ -56,7 +57,7 @@ def test_base_page_number_pagination_process_query_params():
     assert paginator.page_size == 1
 
     # test initialization for default values
-    request = mock.MagicMock()
+    request = MagicMock()
     request.query_params = {}
     paginator = BasePageNumberPagination(request=request, data=[])
 
@@ -67,7 +68,7 @@ def test_base_page_number_pagination_process_query_params():
 def test_base_page_number_pagination_create_pagination_link():
     from starlette.requests import URL
     url = URL('http://testserver/test-resource')
-    request = mock.MagicMock()
+    request = MagicMock()
     request.url = url
 
     paginator = BasePageNumberPagination(request=request, data=[])
@@ -77,7 +78,7 @@ def test_base_page_number_pagination_create_pagination_link():
 
 def test_base_offset_pagination_process_query_params():
     # test initialization on specified values
-    request = mock.MagicMock()
+    request = MagicMock()
     request.query_params = {'page[offset]': 1, 'page[size]': 1}
     paginator = BaseOffsetPagination(request=request, data=[])
 
@@ -85,7 +86,7 @@ def test_base_offset_pagination_process_query_params():
     assert paginator.page_size == 1
 
     # test initialization for default values
-    request = mock.MagicMock()
+    request = MagicMock()
     request.query_params = {}
     paginator = BaseOffsetPagination(request=request, data=[])
 
@@ -95,7 +96,7 @@ def test_base_offset_pagination_process_query_params():
 
 def test_base_offset_pagination_create_pagination_link():
     url = URL('http://testserver/test-resource')
-    request = mock.MagicMock()
+    request = MagicMock()
     request.url = url
 
     paginator = BaseOffsetPagination(request=request, data=[])
@@ -105,7 +106,7 @@ def test_base_offset_pagination_create_pagination_link():
 
 def test_base_cursor_pagination_process_query_params():
     # test initialization on specified values
-    request = mock.MagicMock()
+    request = MagicMock()
     request.query_params = {'page[after]': 2, 'page[before]': 4, 'page[size]': 1}
     paginator = BaseCursorPagination(request=request, data=[])
 
@@ -114,7 +115,7 @@ def test_base_cursor_pagination_process_query_params():
     assert paginator.page_size == 1
 
     # test initialization for default values
-    request = mock.MagicMock()
+    request = MagicMock()
     request.query_params = {}
     paginator = BaseCursorPagination(request=request, data=[])
 
@@ -125,7 +126,7 @@ def test_base_cursor_pagination_process_query_params():
 
 def test_base_cursor_pagination_create_pagination_link():
     url = URL('http://testserver/test-resource')
-    request = mock.MagicMock()
+    request = MagicMock()
     request.url = url
 
     paginator = BaseCursorPagination(request=request, data=[])
@@ -204,33 +205,33 @@ def pagination_app(app: Starlette):
     return app
 
 
-def test_get_many_calls_pagination(pagination_app: Starlette):
+def test_get_many_calls_pagination(pagination_app: Starlette, monkeypatch: MonkeyPatch):
     test_client = TestClient(app=pagination_app)
-    paginate_request_mock = mock.MagicMock(return_value=Future())
+    paginate_request_mock = MagicMock(return_value=Future())
 
     object_list = [dict(id=1, name='foo')]
     links = {'first': 'first', 'next': 'next'}
     paginate_request_mock.return_value.set_result((object_list, links))
 
-    with mock.patch.object(BaseResource, 'paginate_request', paginate_request_mock):
-        rv = test_client.get('/test-resource/')
-        assert paginate_request_mock.called_with(object_list)
-        assert rv.status_code == 200
-        assert rv.json() == {
-            'data': [
-                {
-                    'id': '1',
-                    'type': 'test-resource',
-                    'attributes': {
-                        'name': 'foo'
-                    }
-                },
-            ],
-            'links': {
-                'first': 'first',
-                'next': 'next'
-            }
+    monkeypatch.setattr(BaseResource, 'paginate_request', paginate_request_mock)
+    rv = test_client.get('/test-resource/')
+    assert paginate_request_mock.called_with(object_list)
+    assert rv.status_code == 200
+    assert rv.json() == {
+        'data': [
+            {
+                'id': '1',
+                'type': 'test-resource',
+                'attributes': {
+                    'name': 'foo'
+                }
+            },
+        ],
+        'links': {
+            'first': 'first',
+            'next': 'next'
         }
+    }
 
 
 def test_get_many_without_pagination_class(pagination_app: Starlette):
@@ -243,27 +244,27 @@ def test_get_many_without_pagination_class(pagination_app: Starlette):
         assert str(exc.value) == 'Pagination class must be defined to use pagination'
 
 
-def test_incorrect_request_type(pagination_app: Starlette):
+def test_incorrect_request_type(pagination_app: Starlette, monkeypatch: MonkeyPatch):
     test_client = TestClient(app=pagination_app)
-    paginate_request_mock = mock.MagicMock(return_value=Future())
+    paginate_request_mock = MagicMock(return_value=Future())
     paginate_request_mock.return_value.set_result(([], {}))
 
-    with mock.patch.object(BaseResource, 'paginate_request', paginate_request_mock):
-        rv = test_client.get('/test-resource/1')
-        assert rv.status_code == 200
-        assert paginate_request_mock.not_called
+    monkeypatch.setattr(BaseResource, 'paginate_request', paginate_request_mock)
+    rv = test_client.get('/test-resource/1')
+    assert rv.status_code == 200
+    assert paginate_request_mock.not_called
 
-        rv = test_client.post('/test-resource/', {})
-        assert rv.status_code == 200
-        assert paginate_request_mock.not_called
+    rv = test_client.post('/test-resource/', {})
+    assert rv.status_code == 200
+    assert paginate_request_mock.not_called
 
-        rv = test_client.patch('/test-resource/1', {})
-        assert rv.status_code == 200
-        assert paginate_request_mock.not_called
+    rv = test_client.patch('/test-resource/1', {})
+    assert rv.status_code == 200
+    assert paginate_request_mock.not_called
 
-        rv = test_client.delete('/test-resource/1', )
-        assert rv.status_code == 200
-        assert paginate_request_mock.not_called
+    rv = test_client.delete('/test-resource/1', )
+    assert rv.status_code == 200
+    assert paginate_request_mock.not_called
 
 
 def test_specified_params(pagination_app: Starlette):
