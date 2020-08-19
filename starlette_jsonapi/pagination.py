@@ -22,7 +22,7 @@ class BasePagination:
         - process_query_params
         - generate_pagination_links
     """
-    def __init__(self, request: Request, data: Sequence):
+    def __init__(self, request: Request, data: Sequence, **kwargs):
         self.data = data
         self.request = request
         self.process_query_params()
@@ -169,9 +169,11 @@ class BaseCursorPagination(BasePagination):
             self.default_page_before
         )
 
-    def create_pagination_link(self, page_size: int,
-                               page_after: Union[str, int, None] = None,
-                               page_before: Union[str, int, None] = None) -> str:
+    def create_pagination_link(
+            self, page_size: int,
+            page_after: Union[str, int, None] = None,
+            page_before: Union[str, int, None] = None,
+    ) -> str:
         """Helper method used to easily generate links used in pagination"""
         params = {
             f'page[{self.page_size_param}]': page_size

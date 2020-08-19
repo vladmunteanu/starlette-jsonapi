@@ -134,16 +134,23 @@ class BaseResource(metaclass=RegisteredResourceMeta):
             raise JSONAPIException(status_code=400, errors=errors.get('errors'))
         return body
 
-    async def serialize(self, data: Any, many=False, paginate=False, *args, **kwargs) -> dict:
+    async def serialize(
+            self, data: Any,
+            many: bool = False,
+            paginate: bool = False,
+            pagination_kwargs: dict = None,
+            *args, **kwargs
+    ) -> dict:
         """
         Serializes data as a JSON:API payload and returns a `dict`
         which can be passed when calling `BaseResource.to_response`.
 
+        Extra parameters can be sent inside the pagination process via `pagination_kwargs`
         Additional args and kwargs are passed to the `marshmallow` based Schema.
         """
         links = None
         if paginate:
-            data, links = await self.paginate_request(data)
+            data, links = await self.paginate_request(data, pagination_kwargs)
 
         included_relations = await self._prepare_included(data=data, many=many)
         schema = self.schema(app=self.request.app, include_data=included_relations, *args, **kwargs)
@@ -199,10 +206,16 @@ class BaseResource(metaclass=RegisteredResourceMeta):
             *args, **kwargs,
         )
 
-    async def paginate_request(self, object_list: Sequence) -> Pagination:
+    async def paginate_request(self, object_list: Sequence, pagination_kwargs: dict = None) -> Pagination:
+        """
+        Apply pagination using the helper class defined on the resource
+        Additional parameters can pe saved on the `paginator` instance using pagination_kwargs
+        """
         if not self.pagination_class:
             raise Exception('Pagination class must be defined to use pagination')
-        paginator = self.pagination_class(self.request, object_list)
+
+        pagination_kwargs = pagination_kwargs or {}
+        paginator = self.pagination_class(request=self.request, data=object_list, **pagination_kwargs)
         pagination = paginator.get_pagination()
         return pagination
 

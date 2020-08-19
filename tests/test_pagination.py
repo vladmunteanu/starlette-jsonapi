@@ -66,7 +66,6 @@ def test_base_page_number_pagination_process_query_params():
 
 
 def test_base_page_number_pagination_create_pagination_link():
-    from starlette.requests import URL
     url = URL('http://testserver/test-resource')
     request = MagicMock()
     request.url = url
