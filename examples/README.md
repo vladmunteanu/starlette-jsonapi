@@ -31,7 +31,6 @@ In order to start the service on http://127.0.0.1:8000/, you can run:
 `python start_service.py`
 
 
-
 ## 2. sample-tortoise-orm
 Requires Python > 3.7 to avoid SQL injection bugs in tortoise-orm.
 
@@ -40,6 +39,15 @@ with an in memory SQLite database.
 
 #### Running:
 You can start the service on http://127.0.0.1:8000/, by running:
+`python start_service.py`
+
+
+## 3. sample-sqlalchemy
+
+Contains a basic implementation of 3 resources: `users`, `teams` and `organizations` using sqlalchemy.
+
+#### Running:
+In order to start the service on http://127.0.0.1:8000/, you can run:
 `python start_service.py`
 
 
