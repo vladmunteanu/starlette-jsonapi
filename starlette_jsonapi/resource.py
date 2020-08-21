@@ -210,6 +210,10 @@ class BaseResource(metaclass=RegisteredResourceMeta):
             kwargs.update({'id': id_})
             request_context.update({'id': id_})
 
+        # run before request hook
+        await cls.before_request(request)
+
+        # safely execute the handler
         try:
             if request.method not in cls.allowed_methods:
                 raise JSONAPIException(status_code=405)
@@ -218,7 +222,31 @@ class BaseResource(metaclass=RegisteredResourceMeta):
             response = await handler(*args, **kwargs)  # type: Response
         except Exception as e:
             response = await cls.handle_error(request=request, exc=e)
+
+        # run after request hook
+        await cls.after_request(request=request, response=response)
+
         return response
+
+    @classmethod
+    async def before_request(cls, request: Request) -> None:
+        """
+        Optional hook that can be implemented by subclasses to execute logic before a request is handled.
+        This will not run if an exception is raised before `handle_request` is called.
+
+        For more advanced hooks, check starlette middleware.
+        """
+        return
+
+    @classmethod
+    async def after_request(cls, request: Request, response: Response) -> None:
+        """
+        Optional hook that can be implemented by subclasses to execute logic after a request is handled.
+        This will not run if an exception is raised before `handle_request` is called.
+
+        For more advanced hooks, check starlette middleware.
+        """
+        return
 
     @classmethod
     async def handle_get(cls, request: Request):
