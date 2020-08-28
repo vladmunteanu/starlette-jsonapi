@@ -1,0 +1,7 @@
+uvicorn
+starlette
+marshmallow
+marshmallow_jsonapi
+sqlalchemy
+
+git+ssh://git@github.com/vladmunteanu/starlette-jsonapi
