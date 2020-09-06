@@ -92,7 +92,6 @@ class BasePageNumberPagination(BasePagination):
         self.page_size = page_size
         self.page_number = page_number
 
-
     def create_pagination_link(self, page_number: int, page_size: int) -> str:
         """Helper method used to easily generate links used in pagination"""
         params = {
@@ -191,8 +190,6 @@ class BaseCursorPagination(BasePagination):
             f'page[{self.page_before_param}]',
             self.default_page_before
         )
-
-
 
     def create_pagination_link(
             self, page_size: int,
