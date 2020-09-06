@@ -64,6 +64,13 @@ def test_base_page_number_pagination_process_query_params():
     assert paginator.page_number == paginator.default_page_number
     assert paginator.page_size == paginator.default_page_size
 
+    # test negative page falls back to default
+    request = MagicMock()
+    request.query_params = {'page[number]': -1}
+    paginator = BasePageNumberPagination(request=request, data=[])
+
+    assert paginator.page_number == paginator.default_page_number
+
 
 def test_base_page_number_pagination_create_pagination_link():
     url = URL('http://testserver/test-resource')
@@ -91,6 +98,13 @@ def test_base_offset_pagination_process_query_params():
 
     assert paginator.page_offset == paginator.default_page_offset
     assert paginator.page_size == paginator.default_page_size
+
+    # test negative offset falls back to default
+    request = MagicMock()
+    request.query_params = {'page[offset]': -1}
+    paginator = BaseOffsetPagination(request=request, data=[])
+
+    assert paginator.page_offset == paginator.default_page_offset
 
 
 def test_base_offset_pagination_create_pagination_link():

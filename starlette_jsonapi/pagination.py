@@ -68,6 +68,7 @@ class BasePageNumberPagination(BasePagination):
 
     default_page_number = 1
     default_page_size = 50
+    max_page_size = 100
 
     def process_query_params(self):
         """Extract the page number and page size from the query parameters"""
@@ -80,8 +81,17 @@ class BasePageNumberPagination(BasePagination):
             self.default_page_size
         )
 
-        self.page_number = int(page_number)
-        self.page_size = int(page_size)
+        # perform sanity checks for page size and number values
+        page_size = int(page_size)
+        page_size = min(page_size, self.max_page_size)  # ensure max page size is not exceeded
+
+        page_number = int(page_number)
+        if page_number < 0:
+            page_number = self.default_page_number
+
+        self.page_size = page_size
+        self.page_number = page_number
+
 
     def create_pagination_link(self, page_number: int, page_size: int) -> str:
         """Helper method used to easily generate links used in pagination"""
@@ -108,6 +118,7 @@ class BaseOffsetPagination(BasePagination):
 
     default_page_offset = 0
     default_page_size = 50
+    max_page_size = 100
 
     def process_query_params(self):
         """Extract the page offset and page size from the query parameters"""
@@ -120,8 +131,16 @@ class BaseOffsetPagination(BasePagination):
             self.default_page_size
         )
 
-        self.page_offset = int(page_offset)
-        self.page_size = int(page_size)
+        # perform sanity checks for page size and offset
+        page_size = int(page_size)
+        page_size = min(page_size, self.max_page_size)  # ensure max page size is not exceeded
+
+        page_offset = int(page_offset)
+        if page_offset < 0:
+            page_offset = self.default_page_offset
+
+        self.page_size = page_size
+        self.page_offset = page_offset
 
     def create_pagination_link(self, page_offset: int, page_size: int) -> str:
         """Helper method used to easily generate links used in pagination"""
@@ -151,6 +170,7 @@ class BaseCursorPagination(BasePagination):
     default_page_after = 0
     default_page_before = None
     default_page_size = 50
+    max_page_size = 100
 
     def process_query_params(self):
         """Extract the cursor positions and page size from the query parameters"""
@@ -158,6 +178,9 @@ class BaseCursorPagination(BasePagination):
             f'page[{self.page_size_param}]',
             self.default_page_size
         )
+        # perform sanity checks for page size values
+        page_size = int(page_size)
+        page_size = min(page_size, self.max_page_size)  # ensure max page size is not exceeded
 
         self.page_size = int(page_size)
         self.page_after = self.request.query_params.get(
@@ -168,6 +191,8 @@ class BaseCursorPagination(BasePagination):
             f'page[{self.page_before_param}]',
             self.default_page_before
         )
+
+
 
     def create_pagination_link(
             self, page_size: int,
