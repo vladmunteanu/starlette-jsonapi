@@ -13,8 +13,10 @@ from starlette.testclient import TestClient
 
 from starlette_jsonapi import meta
 from starlette_jsonapi.resource import BaseResource
-from starlette_jsonapi.pagination import (BasePagination, BasePageNumberPagination,
-                                          BaseCursorPagination, BaseOffsetPagination)
+from starlette_jsonapi.pagination import (
+    BasePagination, BasePageNumberPagination,
+    BaseCursorPagination, BaseOffsetPagination
+)
 from starlette_jsonapi.schema import JSONAPISchema
 
 
