@@ -2,13 +2,12 @@ from marshmallow_jsonapi import fields
 from starlette.responses import Response
 from sqlalchemy.orm.exc import NoResultFound
 
-from starlette_jsonapi.resource import BaseResource
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
 
-from accounts.decorators import with_sqlalchemy_session
 from accounts.exceptions import OrganizationNotFound
 from accounts.models import Organization
+from accounts.resources.base import BaseResourceSQLA
 
 
 class OrganizationSchema(JSONAPISchema):
@@ -24,12 +23,11 @@ class OrganizationSchema(JSONAPISchema):
         self_route_many = 'organizations:get_all'
 
 
-class OrganizationsResource(BaseResource):
+class OrganizationsResource(BaseResourceSQLA):
     type_ = 'organizations'
     schema = OrganizationSchema
     id_mask = 'int'
 
-    @with_sqlalchemy_session
     async def get(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise OrganizationNotFound
@@ -40,7 +38,6 @@ class OrganizationsResource(BaseResource):
 
         return await self.to_response(await self.serialize(data=organization))
 
-    @with_sqlalchemy_session
     async def patch(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise OrganizationNotFound
@@ -65,7 +62,6 @@ class OrganizationsResource(BaseResource):
 
         return await self.to_response(await self.serialize(data=organization))
 
-    @with_sqlalchemy_session
     async def delete(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise OrganizationNotFound
@@ -79,12 +75,10 @@ class OrganizationsResource(BaseResource):
 
         return JSONAPIResponse(status_code=204)
 
-    @with_sqlalchemy_session
     async def get_all(self, *args, **kwargs) -> Response:
         organizations = self.db_session.query(Organization).all()
         return await self.to_response(await self.serialize(data=organizations, many=True))
 
-    @with_sqlalchemy_session
     async def post(self, *args, **kwargs) -> Response:
         json_body = await self.deserialize_body()
         organization = Organization()

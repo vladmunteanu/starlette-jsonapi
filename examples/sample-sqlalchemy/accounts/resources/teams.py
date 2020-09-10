@@ -7,13 +7,12 @@ from starlette.responses import Response
 from sqlalchemy.orm.exc import NoResultFound
 
 from starlette_jsonapi.fields import JSONAPIRelationship
-from starlette_jsonapi.resource import BaseResource, BaseRelationshipResource
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
 
-from accounts.decorators import with_sqlalchemy_session
 from accounts.exceptions import TeamNotFound, UserNotFound
 from accounts.models import User, Team
+from accounts.resources.base import BaseResourceSQLA, BaseRelationshipResourceSQLA
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ class TeamSchema(JSONAPISchema):
         self_route_many = 'teams:get_all'
 
 
-class TeamsResource(BaseResource):
+class TeamsResource(BaseResourceSQLA):
     type_ = 'teams'
     schema = TeamSchema
     id_mask = 'int'
@@ -53,7 +52,6 @@ class TeamsResource(BaseResource):
         """
         return
 
-    @with_sqlalchemy_session
     async def get(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise TeamNotFound
@@ -64,7 +62,6 @@ class TeamsResource(BaseResource):
 
         return await self.to_response(await self.serialize(data=team))
 
-    @with_sqlalchemy_session
     async def patch(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise TeamNotFound
@@ -94,7 +91,6 @@ class TeamsResource(BaseResource):
 
         return await self.to_response(await self.serialize(data=team))
 
-    @with_sqlalchemy_session
     async def delete(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise TeamNotFound
@@ -108,12 +104,10 @@ class TeamsResource(BaseResource):
 
         return JSONAPIResponse(status_code=204)
 
-    @with_sqlalchemy_session
     async def get_all(self, *args, **kwargs) -> Response:
         teams = self.db_session.query(Team).all()
         return await self.to_response(await self.serialize(data=teams, many=True))
 
-    @with_sqlalchemy_session
     async def post(self, *args, **kwargs) -> Response:
         json_body = await self.deserialize_body()
 
@@ -137,7 +131,6 @@ class TeamsResource(BaseResource):
         result = await self.serialize(data=team)
         return await self.to_response(result, status_code=201)
 
-    @with_sqlalchemy_session
     async def get_related(self, id: Any, relationship: str, related_id: Any = None, *args, **kwargs) -> Response:
         try:
             team = self.db_session.query(Team).filter_by(id=id).one()
@@ -153,11 +146,10 @@ class TeamsResource(BaseResource):
         raise HTTPException(status_code=404)
 
 
-class TeamUsersResource(BaseRelationshipResource):
+class TeamUsersResource(BaseRelationshipResourceSQLA):
     parent_resource = TeamsResource
     relationship_name = 'users'
 
-    @with_sqlalchemy_session
     async def get(self, parent_id: int, *args, **kwargs) -> Response:
         try:
             team = self.db_session.query(Team).filter_by(id=parent_id).one()
@@ -165,7 +157,6 @@ class TeamUsersResource(BaseRelationshipResource):
             raise TeamNotFound
         return await self.to_response(await self.serialize(data=team))
 
-    @with_sqlalchemy_session
     async def patch(self, parent_id: int, *args, **kwargs) -> Response:
         """ replacing users """
         try:
@@ -188,7 +179,6 @@ class TeamUsersResource(BaseRelationshipResource):
 
         return await self.to_response(await self.serialize(data=team))
 
-    @with_sqlalchemy_session
     async def post(self, parent_id: int, *args, **kwargs) -> Response:
         """ associating with specific users """
         try:
@@ -209,7 +199,6 @@ class TeamUsersResource(BaseRelationshipResource):
         self.db_session.commit()
         return await self.to_response(await self.serialize(data=team))
 
-    @with_sqlalchemy_session
     async def delete(self, parent_id: int, *args, **kwargs) -> Response:
         """ deleting association with specific users """
         try:
