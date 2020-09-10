@@ -251,7 +251,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
             response = await cls.handle_error(request=request, exc=e)
 
         # run after request hook
-        await cls.after_request(request=request, response=response, request_context=request_context)
+        await cls.after_request(request=request, request_context=request_context, response=response)
 
         return response
 
