@@ -7,6 +7,7 @@ from starlette_jsonapi.schema import JSONAPISchema
 
 from accounts.exceptions import OrganizationNotFound
 from accounts.models import Organization
+from accounts.pagination import PageNumberPagination
 
 
 class OrganizationSchema(JSONAPISchema):
@@ -26,6 +27,7 @@ class OrganizationsResource(BaseResource):
     type_ = 'organizations'
     schema = OrganizationSchema
     id_mask = 'int'
+    pagination_class = PageNumberPagination
 
     async def get(self, id=None, *args, **kwargs) -> Response:
         if not id:
@@ -71,7 +73,7 @@ class OrganizationsResource(BaseResource):
 
     async def get_all(self, *args, **kwargs) -> Response:
         organizations = Organization.get_items()
-        return await self.to_response(await self.serialize(data=organizations, many=True))
+        return await self.to_response(await self.serialize(data=organizations, many=True, paginate=True))
 
     async def post(self, *args, **kwargs) -> Response:
         json_body = await self.deserialize_body()

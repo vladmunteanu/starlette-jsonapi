@@ -1,5 +1,5 @@
 import logging
-from typing import Type, Any, List, Optional, Union, Dict
+from typing import Type, Any, List, Optional, Union, Sequence, Dict
 
 from marshmallow.exceptions import ValidationError
 from starlette.applications import Starlette
@@ -12,6 +12,7 @@ from starlette_jsonapi.fields import JSONAPIRelationship
 from starlette_jsonapi.meta import RegisteredResourceMeta
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
+from starlette_jsonapi.pagination import BasePagination, Pagination
 from starlette_jsonapi.utils import (
     parse_included_params,
     parse_sparse_fields_params, filter_sparse_fields,
@@ -45,6 +46,9 @@ class BaseResource(metaclass=RegisteredResourceMeta):
     # By default `str`, but other options are documented in Starlette:
     # 'str', 'int', 'float', 'uuid', 'path'
     id_mask: str = 'str'
+
+    # Pagination class, subclass of BasePagination
+    pagination_class: Optional[Type[BasePagination]] = None
 
     # Optional, by default this will equal `type_` and will be used as the `mount` name.
     # Impacts the result of `url_path_for`, so it can be used to support multiple resource versions.
@@ -130,17 +134,31 @@ class BaseResource(metaclass=RegisteredResourceMeta):
             raise JSONAPIException(status_code=400, errors=errors.get('errors'))
         return body
 
-    async def serialize(self, data: Any, many=False, *args, **kwargs) -> dict:
+    async def serialize(
+            self, data: Any,
+            many: bool = False,
+            paginate: bool = False,
+            pagination_kwargs: dict = None,
+            *args, **kwargs
+    ) -> dict:
         """
         Serializes data as a JSON:API payload and returns a `dict`
         which can be passed when calling `BaseResource.to_response`.
 
+        Extra parameters can be sent inside the pagination process via `pagination_kwargs`
         Additional args and kwargs are passed to the `marshmallow` based Schema.
         """
+        links = None
+        if paginate:
+            data, links = await self.paginate_request(data, pagination_kwargs)
+
         included_relations = await self._prepare_included(data=data, many=many)
         schema = self.schema(app=self.request.app, include_data=included_relations, *args, **kwargs)
         body = schema.dump(data, many=many)
         sparse_body = await self.process_sparse_fields(body, many=many)
+
+        if links:
+            sparse_body['links'] = links
         return sparse_body
 
     async def serialize_related(self, data: Any, many=False, *args, **kwargs) -> dict:
@@ -187,6 +205,19 @@ class BaseResource(metaclass=RegisteredResourceMeta):
             content=data,
             *args, **kwargs,
         )
+
+    async def paginate_request(self, object_list: Sequence, pagination_kwargs: dict = None) -> Pagination:
+        """
+        Apply pagination using the helper class defined on the resource
+        Additional parameters can pe saved on the `paginator` instance using pagination_kwargs
+        """
+        if not self.pagination_class:
+            raise Exception('Pagination class must be defined to use pagination')
+
+        pagination_kwargs = pagination_kwargs or {}
+        paginator = self.pagination_class(request=self.request, data=object_list, **pagination_kwargs)
+        pagination = paginator.get_pagination()
+        return pagination
 
     @classmethod
     async def handle_error(cls, request: Request, exc: Exception) -> JSONAPIResponse:
