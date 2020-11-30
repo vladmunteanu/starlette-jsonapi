@@ -37,7 +37,7 @@ requests==2.24.0          # via -r requirements.in
 rfc3986==1.4.0            # via httpx
 six==1.15.0               # via packaging, tox, virtualenv
 sniffio==1.1.0            # via httpcore, httpx
-starlette==0.13.4         # via -r requirements.in
+starlette==0.14.1         # via -r requirements.in
 toml==0.10.1              # via tox
 tox==3.16.1               # via -r requirements.in
 urllib3==1.25.9           # via requests
