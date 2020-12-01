@@ -63,7 +63,7 @@ def test_jsonapi_relationship_routes(app: Starlette):
             type_ = 'others'
             self_route = 'others:get'
             self_route_kwargs = {'id': '<id>'}
-            self_route_many = 'others:get_all'
+            self_route_many = 'others:get_many'
 
     class OtherResource(BaseResource):
         type_ = 'others'
@@ -89,7 +89,7 @@ def test_jsonapi_relationship_routes(app: Starlette):
             type_ = 'foo'
             self_route = 'foo:get'
             self_route_kwargs = {'id': '<id>'}
-            self_route_many = 'foo:get_all'
+            self_route_many = 'foo:get_many'
 
     class FooResource(BaseResource):
         type_ = 'foo'

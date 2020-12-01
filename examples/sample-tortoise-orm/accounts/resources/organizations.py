@@ -19,7 +19,7 @@ class OrganizationSchema(JSONAPISchema):
         type_ = 'organizations'
         self_route = 'organizations:get'
         self_route_kwargs = {'id': '<id>'}
-        self_route_many = 'organizations:get_all'
+        self_route_many = 'organizations:get_many'
 
 
 class OrganizationsResource(BaseResource):
@@ -72,7 +72,7 @@ class OrganizationsResource(BaseResource):
 
         return JSONResponse(status_code=204)
 
-    async def get_all(self, *args, **kwargs) -> Response:
+    async def get_many(self, *args, **kwargs) -> Response:
         organizations = await Organization.all()
         return await self.to_response(await self.serialize(data=organizations, many=True))
 

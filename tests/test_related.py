@@ -540,7 +540,7 @@ def relationship_links_app(app: Starlette):
             type_ = 'test-related-resource'
             self_route = 'test-related-resource:get'
             self_route_kwargs = {'id': '<id>'}
-            self_route_many = 'test-related-resource:get_all'
+            self_route_many = 'test-related-resource:get_many'
 
     class TRelatedResource(BaseResource):
         type_ = 'test-related-resource'
@@ -565,7 +565,7 @@ def relationship_links_app(app: Starlette):
             type_ = 'test-resource'
             self_route = 'test-resource:get'
             self_route_kwargs = {'id': '<id>'}
-            self_route_many = 'test-resource:get_all'
+            self_route_many = 'test-resource:get_many'
 
     class TResource(BaseResource):
         type_ = 'test-resource'

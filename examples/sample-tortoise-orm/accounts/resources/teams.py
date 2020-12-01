@@ -38,7 +38,7 @@ class TeamSchema(JSONAPISchema):
         type_ = 'teams'
         self_route = 'teams:get'
         self_route_kwargs = {'id': '<id>'}
-        self_route_many = 'teams:get_all'
+        self_route_many = 'teams:get_many'
 
 
 class TeamsResource(BaseResource):
@@ -110,7 +110,7 @@ class TeamsResource(BaseResource):
 
         return JSONAPIResponse(status_code=204)
 
-    async def get_all(self, *args, **kwargs) -> Response:
+    async def get_many(self, *args, **kwargs) -> Response:
         teams = await Team.all().prefetch_related('users')
         return await self.to_response(await self.serialize(data=teams, many=True))
 

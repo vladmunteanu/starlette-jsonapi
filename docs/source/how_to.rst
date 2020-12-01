@@ -120,5 +120,5 @@ Versioning can be implemented by specifying ``register_as`` on the resource clas
     ExampleResourceV2.register_routes(app, base_path='/v2/')
 
     # both resources are now accessible without conflicts:
-    assert app.url_path_for('v1-examples:get_all') == '/v1/examples/'
-    assert app.url_path_for('v2-examples:get_all') == '/v2/examples/'
+    assert app.url_path_for('v1-examples:get_many') == '/v1/examples/'
+    assert app.url_path_for('v2-examples:get_many') == '/v2/examples/'

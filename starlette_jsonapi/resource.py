@@ -63,7 +63,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
     #
     # app = Starlette()
     # SomeResource.register_routes(app=app, base_path='/api/v2')
-    # assert app.url_path_for('v2-examples:get_all') == '/api/v2/examples/'
+    # assert app.url_path_for('v2-examples:get_many') == '/api/v2/examples/'
     # ```
     # `url_path_for` will
     register_as: str = ''
@@ -92,7 +92,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
     async def delete(self, id=None, *args, **kwargs) -> Response:
         raise JSONAPIException(status_code=405)
 
-    async def get_all(self, *args, **kwargs) -> Response:
+    async def get_many(self, *args, **kwargs) -> Response:
         raise JSONAPIException(status_code=405)
 
     async def post(self, *args, **kwargs) -> Response:
@@ -261,7 +261,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         """
         Handles a request by calling the appropriate handler.
         Additional args and kwargs are passed to the handler method,
-        which is usually one of: `get`, `patch`, `delete`, `get_all` or `post`.
+        which is usually one of: `get`, `patch`, `delete`, `get_many` or `post`.
         """
         request_context = request_context or {}
         if extract_id:
@@ -351,8 +351,8 @@ class BaseResource(metaclass=RegisteredResourceMeta):
             ),
             Route(
                 '/',
-                partial(cls.handle_request, 'get_all'),
-                methods=['GET'], name='get_all',
+                partial(cls.handle_request, 'get_many'),
+                methods=['GET'], name='get_many',
             ),
             Route(
                 '/',

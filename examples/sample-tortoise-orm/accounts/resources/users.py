@@ -36,7 +36,7 @@ class UserSchema(JSONAPISchema):
         strict = True
         self_route = 'users:get'
         self_route_kwargs = {'id': '<id>'}
-        self_route_many = 'users:get_all'
+        self_route_many = 'users:get_many'
 
 
 class UsersResource(BaseResource):
@@ -95,7 +95,7 @@ class UsersResource(BaseResource):
 
         return JSONResponse(status_code=204)
 
-    async def get_all(self, *args, **kwargs) -> Response:
+    async def get_many(self, *args, **kwargs) -> Response:
         users = await User.all()
         return await self.to_response(await self.serialize(data=users, many=True))
 

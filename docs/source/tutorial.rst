@@ -129,7 +129,7 @@ by subclassing :class:`starlette_jsonapi.resource.BaseResource`.
             """ Will handle POST /articles/ """
             ...
 
-        async def get_all(self, *args, **kwargs) -> Response:
+        async def get_many(self, *args, **kwargs) -> Response:
             """ Will handle GET /articles/ """
             ...
 
@@ -184,8 +184,8 @@ First, we'll add links by using the route generation available in Starlette
 
             # We also indicate the GET /articles/ route,
             # which is rendered as a link when fetching multiple articles.
-            # `articles:get_all` is the `ArticlesResource.get_all` handler from above.
-            self_route_many = 'articles:get_all'
+            # `articles:get_many` is the `ArticlesResource.get_many` handler from above.
+            self_route_many = 'articles:get_many'
 
         ....
 

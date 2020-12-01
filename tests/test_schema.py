@@ -19,7 +19,7 @@ def test_schema_urls(app: Starlette):
             type_ = 'test-resource'
             self_route = 'test-resource:get'
             self_route_kwargs = {'id': '<id>'}
-            self_route_many = 'test-resource:get_all'
+            self_route_many = 'test-resource:get_many'
 
     rv = TSchema().dump(dict(id='foo', name='foo-name'))
     assert rv == {
@@ -62,7 +62,7 @@ def test_prefixed_schema_urls(app: Starlette):
             type_ = 'test-resource'
             self_route = 'test-resource:get'
             self_route_kwargs = {'id': '<id>'}
-            self_route_many = 'test-resource:get_all'
+            self_route_many = 'test-resource:get_many'
 
     app.url_prefix = 'https://example.com'
     rv = TSchema(app=app).dump(dict(id='foo', name='foo-name'))
