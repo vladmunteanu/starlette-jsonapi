@@ -1,5 +1,6 @@
 import logging
 from typing import Type, Any, List, Optional, Union, Sequence, Dict
+from functools import partial
 
 from marshmallow.exceptions import ValidationError
 from starlette.applications import Starlette
@@ -334,7 +335,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         routes = [
             Route(
                 '/{{id:{}}}/{}/{{related_id:{}}}'.format(cls.id_mask, rel_name, rel_class.id_mask),
-                _partial(relationship=rel_name)(cls.handle_get_related),
+                partial(cls.handle_get_related, relationship=rel_name),
                 methods=['GET'],
                 name=f'{rel_name}-id',
             )
@@ -344,7 +345,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         routes += [
             Route(
                 '/{{id:{}}}/{}'.format(cls.id_mask, rel_name),
-                _partial(relationship=rel_name)(cls.handle_get_related),
+                partial(cls.handle_get_related, relationship=rel_name),
                 methods=['GET'],
                 name=rel_name,
             )
@@ -634,15 +635,3 @@ class BaseRelationshipResource:
                 methods=['GET', 'POST', 'PATCH', 'DELETE'],
             )
         )
-
-
-def _partial(*args, **kwargs):
-    """
-    This is a temporary partial, since we cannot use functools.partial with Starlette due to asyncio bugs.
-    https://github.com/encode/starlette/pull/984
-    """
-    def outer(f):
-        async def inner(request: Request):
-            return await f(request, *args, **kwargs)
-        return inner
-    return outer
