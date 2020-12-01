@@ -78,9 +78,9 @@ class BaseResource(metaclass=RegisteredResourceMeta):
     # Used in `serialize_related`.
     _related: Dict[str, Type['BaseResource']]
 
-    def __init__(self, request: Request, request_context: dict = None, *args, **kwargs) -> None:
+    def __init__(self, request: Request, request_context: dict, *args, **kwargs) -> None:
         self.request = request
-        self.request_context = request_context or {}
+        self.request_context = request_context
 
     async def get(self, id=None, *args, **kwargs) -> Response:
         raise JSONAPIException(status_code=405)
@@ -220,6 +220,33 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         return pagination
 
     @classmethod
+    async def before_request(cls, request: Request, request_context: dict) -> None:
+        """
+        Optional hook that can be implemented by subclasses to execute logic before a request is handled.
+        This will not run if an exception is raised before `handle_request` is called.
+
+        For more advanced hooks, check starlette middleware.
+
+        :param request: The Starlette Request object
+        :param request_context: The current request's context.
+        """
+        return
+
+    @classmethod
+    async def after_request(cls, request: Request, request_context: dict, response: Response) -> None:
+        """
+        Optional hook that can be implemented by subclasses to execute logic after a request is handled.
+        This will not run if an exception is raised before `handle_request` is called.
+
+        For more advanced hooks, check starlette middleware.
+
+        :param request: The Starlette Request object
+        :param request_context: The current request's context.
+        :param response: The Starlette Response object
+        """
+        return
+
+    @classmethod
     async def handle_error(cls, request: Request, exc: Exception) -> JSONAPIResponse:
         if not isinstance(exc, HTTPException):
             logger.exception('Encountered an error while handling request.')
@@ -241,6 +268,10 @@ class BaseResource(metaclass=RegisteredResourceMeta):
             kwargs.update({'id': id_})
             request_context.update({'id': id_})
 
+        # run before request hook
+        await cls.before_request(request=request, request_context=request_context)
+
+        # safely execute the handler
         try:
             if request.method not in cls.allowed_methods:
                 raise JSONAPIException(status_code=405)
@@ -249,6 +280,10 @@ class BaseResource(metaclass=RegisteredResourceMeta):
             response = await handler(*args, **kwargs)  # type: Response
         except Exception as e:
             response = await cls.handle_error(request=request, exc=e)
+
+        # run after request hook
+        await cls.after_request(request=request, request_context=request_context, response=response)
+
         return response
 
     @classmethod
@@ -439,8 +474,9 @@ class BaseRelationshipResource:
     # not listed here will result in a 405 error.
     allowed_methods = {'GET', 'PATCH', 'POST', 'DELETE'}
 
-    def __init__(self, request: Request, *args, **kwargs) -> None:
+    def __init__(self, request: Request, request_context: dict, *args, **kwargs) -> None:
         self.request = request
+        self.request_context = request_context
 
     async def post(self, parent_id: Any, *args, **kwargs) -> Response:
         raise JSONAPIException(status_code=405)
@@ -518,31 +554,66 @@ class BaseRelationshipResource:
         return deserialized_ids
 
     @classmethod
+    async def before_request(cls, request: Request, request_context: dict) -> None:
+        """
+        Optional hook that can be implemented by subclasses to execute logic before a request is handled.
+        This will not run if an exception is raised before `handle_request` is called.
+
+        For more advanced hooks, check starlette middleware.
+
+        :param request: The Starlette Request object
+        :param request_context: The current request's context.
+        """
+        return
+
+    @classmethod
+    async def after_request(cls, request: Request, request_context: dict, response: Response) -> None:
+        """
+        Optional hook that can be implemented by subclasses to execute logic after a request is handled.
+        This will not run if an exception is raised before `handle_request` is called.
+
+        For more advanced hooks, check starlette middleware.
+
+        :param request: The Starlette Request object
+        :param request_context: The current request's context.
+        :param response: The Starlette Response object
+        """
+        return
+
+    @classmethod
     async def handle_error(cls, request: Request, exc: Exception) -> JSONAPIResponse:
         if not isinstance(exc, HTTPException):
             logger.exception('Encountered an error while handling request.')
         return serialize_error(exc)
 
     @classmethod
-    async def handle_request(cls, request: Request, *args, **kwargs) -> Response:
+    async def handle_request(cls, request: Request, request_context: dict = None, *args, **kwargs) -> Response:
         """
         Handles a request by calling the appropriate handler based on the request method.
         Additional args and kwargs are passed to the handler method,
         which is usually one of: `get`, `patch`, `delete`, or `post`.
         """
+        request_context = request_context or {}
+        # run before request hook
+        await cls.before_request(request=request, request_context=request_context)
+
         try:
             if request.method not in cls.allowed_methods:
                 raise JSONAPIException(status_code=405)
             kwargs.update(parent_id=request.path_params['parent_id'])
-            resource = cls(request)
+            resource = cls(request, request_context=request_context)
             handler = getattr(resource, request.method.lower(), None)
             response = await handler(*args, **kwargs)  # type: Response
         except Exception as e:
             response = await cls.handle_error(request=request, exc=e)
+
+        # run after request hook
+        await cls.after_request(request=request, request_context=request_context, response=response)
+
         return response
 
     @classmethod
-    def register_routes(cls, app: Starlette, *args, **kwargs):
+    def register_routes(cls, *args, **kwargs):
         if not cls.parent_resource.type_:
             raise Exception(
                 'Cannot register a relationship resource if the `parent_resource` does not specify a `type_`.'

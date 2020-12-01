@@ -1,6 +1,8 @@
 import logging
 import uuid
+from asyncio import Future
 from typing import Any, List
+from unittest import mock
 
 import pytest
 from marshmallow_jsonapi import fields
@@ -814,3 +816,69 @@ def test_top_level_meta(app: Starlette):
             'some-meta-attribute': 'some-meta-value',
         }
     }
+
+
+@pytest.mark.asyncio
+async def test_before_request_called(monkeypatch):
+    f = Future()  # type: Future
+    f.set_result('foo')
+    fake_before_request = mock.MagicMock(return_value=f)
+    fake_request = mock.MagicMock()
+    fake_request.path_params = {'id': '123'}
+
+    class TResource(BaseResource):
+        pass
+
+    monkeypatch.setattr(TResource, 'before_request', fake_before_request)
+
+    assert fake_before_request.call_count == 0
+
+    await TResource.handle_get(fake_request)
+
+    assert fake_before_request.call_count == 1
+    assert fake_before_request.call_args_list[0][1] == {
+        'request': fake_request,
+        'request_context': {'id': '123'},
+    }
+
+
+@pytest.mark.asyncio
+async def test_after_request_called(monkeypatch):
+    f = Future()  # type: Future
+    f.set_result('foo')
+    fake_after_request = mock.MagicMock(return_value=f)
+    fake_request = mock.MagicMock()
+    fake_request.method = 'GET'
+    fake_request.path_params = {'id': '123'}
+    fake_response = mock.MagicMock()
+
+    class TResource(BaseResource):
+
+        async def get(self, id=None, *args, **kwargs) -> Response:
+            return fake_response
+
+    monkeypatch.setattr(TResource, 'after_request', fake_after_request)
+
+    assert fake_after_request.call_count == 0
+
+    await TResource.handle_get(fake_request)
+
+    assert fake_after_request.call_count == 1
+    assert fake_after_request.call_args_list[0][1] == {
+        'request': fake_request,
+        'request_context': {'id': '123'},
+        'response': fake_response,
+    }
+
+    # check that after_request is called when an exception is raised
+    class TBuggyResource(BaseResource):
+
+        async def get(self, id=None, *args, **kwargs) -> Response:
+            raise Exception('something bad happened')
+
+    monkeypatch.setattr(TBuggyResource, 'after_request', fake_after_request)
+
+    assert fake_after_request.call_count == 1
+    r = await TBuggyResource.handle_get(fake_request)
+    assert r.status_code == 500
+    assert fake_after_request.call_count == 2

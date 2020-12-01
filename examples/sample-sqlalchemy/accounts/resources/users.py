@@ -7,14 +7,13 @@ from starlette.responses import Response
 from sqlalchemy.orm.exc import NoResultFound
 
 from starlette_jsonapi.fields import JSONAPIRelationship
-from starlette_jsonapi.resource import BaseResource
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
 
 from accounts.app import Session
-from accounts.decorators import with_sqlalchemy_session
 from accounts.exceptions import UserNotFound
 from accounts.models import User, Organization
+from accounts.resources.base import BaseResourceSQLA
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ class UserSchema(JSONAPISchema):
         self_route_many = 'users:get_all'
 
 
-class UsersResource(BaseResource):
+class UsersResource(BaseResourceSQLA):
     type_ = 'users'
     schema = UserSchema
     id_mask = 'int'
@@ -58,7 +57,6 @@ class UsersResource(BaseResource):
         # as is generally the case with an async orm.
         return None
 
-    @with_sqlalchemy_session
     async def get(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise UserNotFound
@@ -69,7 +67,6 @@ class UsersResource(BaseResource):
 
         return await self.to_response(await self.serialize(data=user))
 
-    @with_sqlalchemy_session
     async def patch(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise UserNotFound
@@ -96,7 +93,6 @@ class UsersResource(BaseResource):
 
         return await self.to_response(await self.serialize(data=user))
 
-    @with_sqlalchemy_session
     async def delete(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise UserNotFound
@@ -110,12 +106,10 @@ class UsersResource(BaseResource):
 
         return JSONAPIResponse(status_code=204)
 
-    @with_sqlalchemy_session
     async def get_all(self, *args, **kwargs) -> Response:
         users = self.db_session.query(User).all()
         return await self.to_response(await self.serialize(data=users, many=True))
 
-    @with_sqlalchemy_session
     async def post(self, *args, **kwargs) -> Response:
         json_body = await self.deserialize_body()
 
@@ -139,7 +133,6 @@ class UsersResource(BaseResource):
         result = await self.serialize(data=user)
         return await self.to_response(result, status_code=201)
 
-    @with_sqlalchemy_session
     async def get_related(self, id: Any, relationship: str, related_id: Any = None, *args, **kwargs) -> Response:
         try:
             user = self.db_session.query(User).filter_by(id=id).one()
