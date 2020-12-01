@@ -1,6 +1,6 @@
+import functools
 import logging
 from typing import Type, Any, List, Optional, Union, Sequence, Dict
-from functools import partial
 
 from marshmallow.exceptions import ValidationError
 from starlette.applications import Starlette
@@ -315,7 +315,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         routes = [
             Route(
                 '/{{id:{}}}/{}/{{related_id:{}}}'.format(cls.id_mask, rel_name, rel_class.id_mask),
-                partial(cls.handle_get_related, relationship=rel_name),
+                functools.partial(cls.handle_get_related, relationship=rel_name),
                 methods=['GET'],
                 name=f'{rel_name}-id',
             )
@@ -325,7 +325,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         routes += [
             Route(
                 '/{{id:{}}}/{}'.format(cls.id_mask, rel_name),
-                partial(cls.handle_get_related, relationship=rel_name),
+                functools.partial(cls.handle_get_related, relationship=rel_name),
                 methods=['GET'],
                 name=rel_name,
             )
@@ -336,27 +336,27 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         routes += [
             Route(
                 '/{{id:{}}}'.format(cls.id_mask),
-                partial(cls.handle_request, 'get', extract_id=True),
+                functools.partial(cls.handle_request, 'get', extract_id=True),
                 methods=['GET'], name='get',
             ),
             Route(
                 '/{{id:{}}}'.format(cls.id_mask),
-                partial(cls.handle_request, 'patch', extract_id=True),
+                functools.partial(cls.handle_request, 'patch', extract_id=True),
                 methods=['PATCH'], name='patch',
             ),
             Route(
                 '/{{id:{}}}'.format(cls.id_mask),
-                partial(cls.handle_request, 'delete', extract_id=True),
+                functools.partial(cls.handle_request, 'delete', extract_id=True),
                 methods=['DELETE'], name='delete',
             ),
             Route(
                 '/',
-                partial(cls.handle_request, 'get_many'),
+                functools.partial(cls.handle_request, 'get_many'),
                 methods=['GET'], name='get_many',
             ),
             Route(
                 '/',
-                partial(cls.handle_request, 'post'),
+                functools.partial(cls.handle_request, 'post'),
                 methods=['POST'], name='post',
             ),
         ]
