@@ -84,27 +84,69 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         self.request_context = request_context
 
     async def get(self, id=None, *args, **kwargs) -> Response:
+        """ Subclasses should implement this to handle GET /<id> requests. """
         raise JSONAPIException(status_code=405)
 
     async def patch(self, id=None, *args, **kwargs) -> Response:
+        """ Subclasses should implement this to handle PATCH /<id> requests. """
         raise JSONAPIException(status_code=405)
 
     async def delete(self, id=None, *args, **kwargs) -> Response:
+        """ Subclasses should implement this to handle DELETE /<id> requests. """
         raise JSONAPIException(status_code=405)
 
     async def get_many(self, *args, **kwargs) -> Response:
+        """ Subclasses should implement this to handle GET / requests. """
         raise JSONAPIException(status_code=405)
 
     async def post(self, *args, **kwargs) -> Response:
+        """ Subclasses should implement this to handle POST / requests. """
         raise JSONAPIException(status_code=405)
 
     async def get_related(self, id: Any, relationship: str, related_id: Any = None, *args, **kwargs) -> Response:
         """
-        Subclasses should implement this if they specify relationships
-        and want to support fetching related resources.
+        Subclasses should implement this to handle GET /<id>/<relationship>[/<related_id>].
         By default returns a 405 error.
         """
         raise JSONAPIException(status_code=405)
+
+    async def prepare_relations(self, obj: Any, relations: List[str]) -> None:
+        """
+        Subclasses should implement this to handle requests for compound documents.
+        Example request URL: GET /?include=relationship1,relationship1.child_relationship
+        Example `relations`: ['relationship1', 'relationship1.child_relationship']
+
+        :param obj: an object that was passed to `serialize`
+        :param relations: list of relations described above
+        """
+        raise _StopInclude
+
+    @classmethod
+    async def before_request(cls, request: Request, request_context: dict) -> None:
+        """
+        Optional hook that can be implemented by subclasses to execute logic before a request is handled.
+        This will not run if an exception is raised before `handle_request` is called.
+
+        For more advanced hooks, check starlette middleware.
+
+        :param request: The Starlette Request object
+        :param request_context: The current request's context.
+        """
+        return
+
+    @classmethod
+    async def after_request(cls, request: Request, request_context: dict, response: Response) -> None:
+        """
+        Optional hook that can be implemented by subclasses to execute logic after a request is handled.
+        This will not run if an exception is raised before `handle_request` is called.
+
+        For more advanced hooks, check starlette middleware.
+
+        :param request: The Starlette Request object
+        :param request_context: The current request's context.
+        :param response: The Starlette Response object
+        """
+        return
 
     async def deserialize_body(self, partial=None) -> dict:
         """ Returns the request body as defined by this Resource's `schema`."""
@@ -115,7 +157,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
     async def validate_body(self, partial=None) -> dict:
         """
         Validates the raw request body, raising JSONAPIException 400 errors if the body is not valid.
-        Otherwise, the request.json() content is returned.
+        Otherwise, the whole request body is loaded and returned.
         """
         content_type = self.request.headers.get('content-type')
         if self.request.method in ('POST', 'PATCH') and content_type != 'application/vnd.api+json':
@@ -219,33 +261,6 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         paginator = self.pagination_class(request=self.request, data=object_list, **pagination_kwargs)
         pagination = paginator.get_pagination()
         return pagination
-
-    @classmethod
-    async def before_request(cls, request: Request, request_context: dict) -> None:
-        """
-        Optional hook that can be implemented by subclasses to execute logic before a request is handled.
-        This will not run if an exception is raised before `handle_request` is called.
-
-        For more advanced hooks, check starlette middleware.
-
-        :param request: The Starlette Request object
-        :param request_context: The current request's context.
-        """
-        return
-
-    @classmethod
-    async def after_request(cls, request: Request, request_context: dict, response: Response) -> None:
-        """
-        Optional hook that can be implemented by subclasses to execute logic after a request is handled.
-        This will not run if an exception is raised before `handle_request` is called.
-
-        For more advanced hooks, check starlette middleware.
-
-        :param request: The Starlette Request object
-        :param request_context: The current request's context.
-        :param response: The Starlette Response object
-        """
-        return
 
     @classmethod
     async def handle_error(cls, request: Request, exc: Exception) -> JSONAPIResponse:
@@ -390,20 +405,6 @@ class BaseResource(metaclass=RegisteredResourceMeta):
                 return None
         return include_param_list
 
-    async def prepare_relations(self, obj: Any, relations: List[str]) -> None:
-        """
-        Should be implemented by subclasses in order to support compound documents
-        for asynchronous objects that may need fetching.
-
-        Example `relations`:
-            url = /some-url?include=resource1,resource1.resource2
-            relations = ['resource1', 'resource1.resource2']
-
-        :param obj: an object that was passed to `serialize`
-        :param relations: list of relations, ex: ['resource1', 'resource1.resource2']
-        """
-        raise _StopInclude
-
     # Methods used to implement sparse fields
     # https://jsonapi.org/format/#fetching-sparse-fieldsets
     async def process_sparse_fields(self, serialized_data: dict, many: bool = False) -> dict:
@@ -465,16 +466,47 @@ class BaseRelationshipResource:
         self.request_context = request_context
 
     async def post(self, parent_id: Any, *args, **kwargs) -> Response:
+        """ Subclasses should implement this to handle POST /<parent_id>/relationships/<relationship> requests. """
         raise JSONAPIException(status_code=405)
 
     async def get(self, parent_id: Any, *args, **kwargs) -> Response:
+        """ Subclasses should implement this to handle GET /<parent_id>/relationships/<relationship> requests. """
         raise JSONAPIException(status_code=405)
 
     async def patch(self, parent_id: Any, *args, **kwargs) -> Response:
+        """ Subclasses should implement this to handle PATCH /<parent_id>/relationships/<relationship> requests. """
         raise JSONAPIException(status_code=405)
 
     async def delete(self, parent_id: Any, *args, **kwargs) -> Response:
+        """ Subclasses should implement this to handle DELETE /<parent_id>/relationships/<relationship> requests. """
         raise JSONAPIException(status_code=405)
+
+    @classmethod
+    async def before_request(cls, request: Request, request_context: dict) -> None:
+        """
+        Optional hook that can be implemented by subclasses to execute logic before a request is handled.
+        This will not run if an exception is raised before `handle_request` is called.
+
+        For more advanced hooks, check starlette middleware.
+
+        :param request: The Starlette Request object
+        :param request_context: The current request's context.
+        """
+        return
+
+    @classmethod
+    async def after_request(cls, request: Request, request_context: dict, response: Response) -> None:
+        """
+        Optional hook that can be implemented by subclasses to execute logic after a request is handled.
+        This will not run if an exception is raised before `handle_request` is called.
+
+        For more advanced hooks, check starlette middleware.
+
+        :param request: The Starlette Request object
+        :param request_context: The current request's context.
+        :param response: The Starlette Response object
+        """
+        return
 
     def _get_relationship_field(self) -> JSONAPIRelationship:
         """ Returns the relationship field defined on the parent resource schema. """
@@ -538,33 +570,6 @@ class BaseRelationshipResource:
 
             raise JSONAPIException(status_code=400, errors=errors)
         return deserialized_ids
-
-    @classmethod
-    async def before_request(cls, request: Request, request_context: dict) -> None:
-        """
-        Optional hook that can be implemented by subclasses to execute logic before a request is handled.
-        This will not run if an exception is raised before `handle_request` is called.
-
-        For more advanced hooks, check starlette middleware.
-
-        :param request: The Starlette Request object
-        :param request_context: The current request's context.
-        """
-        return
-
-    @classmethod
-    async def after_request(cls, request: Request, request_context: dict, response: Response) -> None:
-        """
-        Optional hook that can be implemented by subclasses to execute logic after a request is handled.
-        This will not run if an exception is raised before `handle_request` is called.
-
-        For more advanced hooks, check starlette middleware.
-
-        :param request: The Starlette Request object
-        :param request_context: The current request's context.
-        :param response: The Starlette Response object
-        """
-        return
 
     @classmethod
     async def handle_error(cls, request: Request, exc: Exception) -> JSONAPIResponse:
