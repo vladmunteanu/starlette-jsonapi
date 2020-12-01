@@ -833,7 +833,7 @@ async def test_before_request_called(monkeypatch):
 
     assert fake_before_request.call_count == 0
 
-    await TResource.handle_get(fake_request)
+    await TResource.handle_request('get', fake_request, extract_id=True)
 
     assert fake_before_request.call_count == 1
     assert fake_before_request.call_args_list[0][1] == {
@@ -861,7 +861,7 @@ async def test_after_request_called(monkeypatch):
 
     assert fake_after_request.call_count == 0
 
-    await TResource.handle_get(fake_request)
+    await TResource.handle_request('get', fake_request, extract_id=True)
 
     assert fake_after_request.call_count == 1
     assert fake_after_request.call_args_list[0][1] == {
@@ -879,6 +879,6 @@ async def test_after_request_called(monkeypatch):
     monkeypatch.setattr(TBuggyResource, 'after_request', fake_after_request)
 
     assert fake_after_request.call_count == 1
-    r = await TBuggyResource.handle_get(fake_request)
+    r = await TBuggyResource.handle_request('get', fake_request, extract_id=True)
     assert r.status_code == 500
     assert fake_after_request.call_count == 2

@@ -288,26 +288,6 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         return response
 
     @classmethod
-    async def handle_get(cls, request: Request):
-        return await cls.handle_request(handler_name='get', request=request, extract_id=True)
-
-    @classmethod
-    async def handle_patch(cls, request: Request):
-        return await cls.handle_request(handler_name='patch', request=request, extract_id=True)
-
-    @classmethod
-    async def handle_delete(cls, request: Request):
-        return await cls.handle_request(handler_name='delete', request=request, extract_id=True)
-
-    @classmethod
-    async def handle_get_all(cls, request: Request):
-        return await cls.handle_request(handler_name='get_all', request=request)
-
-    @classmethod
-    async def handle_post(cls, request: Request):
-        return await cls.handle_request(handler_name='post', request=request)
-
-    @classmethod
     async def handle_get_related(cls, request: Request, relationship: str = None):
         """ Handles related resources requests, such as /articles/1/author. """
         related_id = request.path_params.get('related_id')
@@ -355,23 +335,28 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         # attach primary routes, example: /articles/ and /articles/1
         routes += [
             Route(
-                '/{{id:{}}}'.format(cls.id_mask), cls.handle_get,
+                '/{{id:{}}}'.format(cls.id_mask),
+                partial(cls.handle_request, 'get', extract_id=True),
                 methods=['GET'], name='get',
             ),
             Route(
-                '/{{id:{}}}'.format(cls.id_mask), cls.handle_patch,
+                '/{{id:{}}}'.format(cls.id_mask),
+                partial(cls.handle_request, 'patch', extract_id=True),
                 methods=['PATCH'], name='patch',
             ),
             Route(
-                '/{{id:{}}}'.format(cls.id_mask), cls.handle_delete,
+                '/{{id:{}}}'.format(cls.id_mask),
+                partial(cls.handle_request, 'delete', extract_id=True),
                 methods=['DELETE'], name='delete',
             ),
             Route(
-                '/', cls.handle_get_all,
+                '/',
+                partial(cls.handle_request, 'get_all'),
                 methods=['GET'], name='get_all',
             ),
             Route(
-                '/', cls.handle_post,
+                '/',
+                partial(cls.handle_request, 'post'),
                 methods=['POST'], name='post',
             ),
         ]
