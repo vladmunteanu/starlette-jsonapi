@@ -10,6 +10,7 @@ Submodules
    starlette_jsonapi.exceptions
    starlette_jsonapi.fields
    starlette_jsonapi.meta
+   starlette_jsonapi.pagination
    starlette_jsonapi.resource
    starlette_jsonapi.responses
    starlette_jsonapi.schema

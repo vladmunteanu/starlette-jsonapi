@@ -7,7 +7,9 @@ logger = logging.getLogger(__name__)
 
 
 class Pagination(NamedTuple):
+    #: Sequence of items representing a single page
     data: Sequence
+    #: Dictionary of pagination links
     links: Dict[str, Optional[str]]
 
 
@@ -55,9 +57,10 @@ class BasePagination:
 class BasePageNumberPagination(BasePagination):
     """
     Base class for accommodating the page number pagination strategy using the standard parameters
-    under the JSON:API format
-        - page[number]
-        - page[size]
+    under the JSON:API format:
+
+    * page[number]
+    * page[size]
 
     Implementation will require overriding the following methods:
         - slice_data
@@ -105,8 +108,9 @@ class BaseOffsetPagination(BasePagination):
     """
     Base class for accommodating the offset pagination strategy using the standard parameters
     under the JSON:API format
-        - page[offset]
-        - page[size]
+
+    * page[offset]
+    * page[size]
 
     Implementation will require overriding the following methods:
         - slice_data
@@ -154,9 +158,10 @@ class BaseCursorPagination(BasePagination):
     """
     Base class for accommodating the cursor pagination strategy using the standard parameters
     under the JSON:API format
-        - page[after]
-        - page[before]
-        - page[size]
+
+    * page[after]
+    * page[before]
+    * page[size]
 
     Implementation will require overriding the following methods:
         - slice_data

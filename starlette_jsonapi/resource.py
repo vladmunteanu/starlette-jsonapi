@@ -24,99 +24,153 @@ logger = logging.getLogger(__name__)
 
 
 class BaseResource(metaclass=RegisteredResourceMeta):
-    """ A basic json:api resource implementation, data layer agnostic. """
+    """A basic json:api resource implementation, data layer agnostic.
 
-    # The json:api type, used to compute the path for this resource
-    # such that BaseResource.register_routes(app=app, base_path='/api/') will register
-    # the following routes:
-    # - GET `/api/<type_>/`
-    # - POST `/api/<type_>/`
-    # - GET `/api/<type_>/{id:str}`
-    # - PATCH `/api/<type_>/{id:str}`
-    # - DELETE `/api/<type_>/{id:str}`
+    Subclasses can achieve basic functionality by implementing:
+
+        :meth:`get` :meth:`patch` :meth:`delete` :meth:`get_many` :meth:`post`
+
+    Additionally:
+
+        - requests for compound documents (Example: ``GET /api/v1/articles?include=author``) can be
+          supported by overriding :meth:`prepare_relations` to pre-populate
+          the relationship objects before serializing.
+
+        - requests for related objects (Example: ``GET /api/v1/articles/123/author``), can be supported
+          by overriding :meth:`get_related`, then serializing with :meth:`serialize_related`.
+
+    By default, requests for sparse fields will be handled by the :class:`BaseResource` implementation,
+    without any effort required.
+
+    Example subclass:
+
+    .. code-block:: python
+
+        class ExampleResource(BaseResource):
+            type_ = 'examples'
+            allowed_methods = {'GET'}
+
+            async def get(self, id: str, *args, **kwargs) -> Response:
+                obj = Example.objects.get(id)
+                serialized_obj = await self.serialize(obj)
+                return await self.to_response(serialized_obj)
+
+            async def get_many(self, *args, **kwargs) -> Response:
+                objects = Example.objects.all()
+                serialized_objects = await self.serialize(objects, many=True)
+                return await self.to_response(serialized_objects)
+
+    """
+
+    #: The json:api type, used to compute the path for this resource
+    #: such that ``BaseResource.register_routes(app=app, base_path='/api/')`` will register
+    #: the following routes:
+    #:
+    #: - ``GET /api/<type_>/``
+    #: - ``POST /api/<type_>/``
+    #: - ``GET /api/<type_>/{id:str}``
+    #: - ``PATCH /api/<type_>/{id:str}``
+    #: - ``DELETE /api/<type_>/{id:str}``
     type_: str = ''
 
-    # The json:api serializer, a subclass of JSONAPISchema.
+    #: The json:api serializer, a subclass of :class:`JSONAPISchema`.
     schema: Type[JSONAPISchema] = JSONAPISchema
 
-    # High level filter for HTTP requests.
-    # If you specify a smaller subset, any request that specifies a method
-    # not listed here will result in a 405 error.
+    #: High level filter for HTTP requests.
+    #: If you specify a smaller subset, any request that specifies a method
+    #: not listed here will result in a 405 error.
     allowed_methods = {'GET', 'PATCH', 'POST', 'DELETE'}
 
-    # By default `str`, but other options are documented in Starlette:
-    # 'str', 'int', 'float', 'uuid', 'path'
+    #: By default `str`, but other options are documented in Starlette:
+    #: ``'str', 'int', 'float', 'uuid', 'path'``
     id_mask: str = 'str'
 
-    # Pagination class, subclass of BasePagination
+    #: Pagination class, subclass of :class:`BasePagination`
     pagination_class: Optional[Type[BasePagination]] = None
 
-    # Optional, by default this will equal `type_` and will be used as the `mount` name.
-    # Impacts the result of `url_path_for`, so it can be used to support multiple resource versions.
-    # For example:
-    # ```
-    # from starlette.applications import Starlette
-    #
-    # class SomeResource(BaseResource):
-    #   type_ = 'examples'
-    #   register_as = 'v2-examples'
-    #
-    # app = Starlette()
-    # SomeResource.register_routes(app=app, base_path='/api/v2')
-    # assert app.url_path_for('v2-examples:get_many') == '/api/v2/examples/'
-    # ```
-    # `url_path_for` will
     register_as: str = ''
+    """
+    Optional, by default this will equal :attr:`type_` and will be used as the :attr:`mount` name.
+    Impacts the result of ``url_path_for``, so it can be used to support multiple resource versions.
+
+    .. code-block:: python
+
+        from starlette.applications import Starlette
+
+        class ExamplesResource(BaseResource):
+            type_ = 'examples'
+            register_as = 'v2-examples'
+
+        app = Starlette()
+        ExamplesResource.register_routes(app=app, base_path='/api/v2')
+        assert app.url_path_for('v2-examples:get_many') == '/api/v2/examples/'
+    """
+
+    #: The underlying :class:`starlette.routing.Mount` object used for registering routes.
     mount: Mount
 
-    # Switch for controlling meta class registration.
-    # Being able to refer to another resource via its name,
-    # rather than directly passing it, will prevent circular imports in projects.
-    # By default, subclasses are registered.
+    #: Switch for controlling meta class registration.
+    #: Being able to refer to another resource via its name,
+    #: rather than directly passing it, will prevent circular imports in projects.
+    #: By default, subclasses are registered.
     register_resource = False
 
-    # This will be populated when routes are registered and we detect related resources.
-    # Used in `serialize_related`.
+    #: This will be populated when routes are registered and we detect related resources.
+    #: Used in :meth:`serialize_related`.
     _related: Dict[str, Type['BaseResource']]
 
     def __init__(self, request: Request, request_context: dict, *args, **kwargs) -> None:
-        self.request = request
-        self.request_context = request_context
+        """
+        A Resource instance is created for each HTTP request, and the :class:`starlette.requests.Request`
+        is passed, as well as the context, which can be used to store information without altering the request object.
+        """
+        #: Instance attribute representing the current HTTP request.
+        self.request: Request = request
+        #: Instance attribute representing the context of the current HTTP request.
+        #: Can be used to store additional information for the duration of a request.
+        self.request_context: dict = request_context
 
-    async def get(self, id=None, *args, **kwargs) -> Response:
-        """ Subclasses should implement this to handle GET /<id> requests. """
+    async def get(self, id: Any, *args, **kwargs) -> Response:
+        """ Subclasses should implement this to handle ``GET /<id>`` requests. """
         raise JSONAPIException(status_code=405)
 
-    async def patch(self, id=None, *args, **kwargs) -> Response:
-        """ Subclasses should implement this to handle PATCH /<id> requests. """
+    async def patch(self, id: Any, *args, **kwargs) -> Response:
+        """ Subclasses should implement this to handle ``PATCH /<id>`` requests. """
         raise JSONAPIException(status_code=405)
 
-    async def delete(self, id=None, *args, **kwargs) -> Response:
-        """ Subclasses should implement this to handle DELETE /<id> requests. """
+    async def delete(self, id: Any, *args, **kwargs) -> Response:
+        """ Subclasses should implement this to handle ``DELETE /<id>`` requests. """
         raise JSONAPIException(status_code=405)
 
     async def get_many(self, *args, **kwargs) -> Response:
-        """ Subclasses should implement this to handle GET / requests. """
+        """ Subclasses should implement this to handle ``GET /`` requests. """
         raise JSONAPIException(status_code=405)
 
     async def post(self, *args, **kwargs) -> Response:
-        """ Subclasses should implement this to handle POST / requests. """
+        """ Subclasses should implement this to handle ``POST /`` requests. """
         raise JSONAPIException(status_code=405)
 
     async def get_related(self, id: Any, relationship: str, related_id: Any = None, *args, **kwargs) -> Response:
         """
-        Subclasses should implement this to handle GET /<id>/<relationship>[/<related_id>].
+        Subclasses should implement this to handle ``GET /<id>/<relationship>[/<related_id>]``.
         By default returns a 405 error.
+
+        :param id: the resource id
+        :param relationship: name of the relationship
+        :param related_id: optional, an id can be specified to identify a specific related resource,
+                           in case of one-to-many relationships.
         """
         raise JSONAPIException(status_code=405)
 
     async def prepare_relations(self, obj: Any, relations: List[str]) -> None:
         """
         Subclasses should implement this to handle requests for compound documents.
-        Example request URL: GET /?include=relationship1,relationship1.child_relationship
-        Example `relations`: ['relationship1', 'relationship1.child_relationship']
+        `<https://jsonapi.org/format/#document-compound-documents>`_
 
-        :param obj: an object that was passed to `serialize`
+        Example request URL: ``GET /?include=relationship1,relationship1.child_relationship``
+        Example relations: ``['relationship1', 'relationship1.child_relationship']``
+
+        :param obj: an object that was passed to :meth:`serialize`
         :param relations: list of relations described above
         """
         raise _StopInclude
@@ -125,11 +179,11 @@ class BaseResource(metaclass=RegisteredResourceMeta):
     async def before_request(cls, request: Request, request_context: dict) -> None:
         """
         Optional hook that can be implemented by subclasses to execute logic before a request is handled.
-        This will not run if an exception is raised before `handle_request` is called.
+        This will not run if an exception is raised before :meth:`handle_request` is called.
 
         For more advanced hooks, check starlette middleware.
 
-        :param request: The Starlette Request object
+        :param request: The current HTTP request
         :param request_context: The current request's context.
         """
         return
@@ -138,25 +192,25 @@ class BaseResource(metaclass=RegisteredResourceMeta):
     async def after_request(cls, request: Request, request_context: dict, response: Response) -> None:
         """
         Optional hook that can be implemented by subclasses to execute logic after a request is handled.
-        This will not run if an exception is raised before `handle_request` is called.
+        This will not run if an exception is raised before :meth:`handle_request` is called.
 
         For more advanced hooks, check starlette middleware.
 
-        :param request: The Starlette Request object
+        :param request: The current HTTP request
         :param request_context: The current request's context.
         :param response: The Starlette Response object
         """
         return
 
     async def deserialize_body(self, partial=None) -> dict:
-        """ Returns the request body as defined by this Resource's `schema`."""
+        """ Returns the request body parsed according to :attr:`schema`."""
         raw_body = await self.validate_body(partial=partial)
         deserialized_body = self.schema(app=self.request.app).load(raw_body, partial=partial)
         return deserialized_body
 
     async def validate_body(self, partial=None) -> dict:
         """
-        Validates the raw request body, raising JSONAPIException 400 errors if the body is not valid.
+        Validates the raw request body, raising :class:`JSONAPIException` 400 errors if the body is not valid.
         Otherwise, the whole request body is loaded and returned.
         """
         content_type = self.request.headers.get('content-type')
@@ -186,10 +240,15 @@ class BaseResource(metaclass=RegisteredResourceMeta):
     ) -> dict:
         """
         Serializes data as a JSON:API payload and returns a `dict`
-        which can be passed when calling `BaseResource.to_response`.
+        which can be passed when calling :meth:`to_response`.
 
-        Extra parameters can be sent inside the pagination process via `pagination_kwargs`
-        Additional args and kwargs are passed to the `marshmallow` based Schema.
+        Extra parameters can be sent inside the pagination process via ``pagination_kwargs``
+        Additional args and kwargs are passed when initializing a new :attr:`schema`.
+
+        :param data: an object, or a sequence of objects to be serialized
+        :param many: whether multiple objects were passed
+        :param paginate: whether to apply pagination to the given ``data``
+        :param pagination_kwargs: additional parameters which are passed to :meth:`paginate_request`.
         """
         links = None
         if paginate:
@@ -206,12 +265,16 @@ class BaseResource(metaclass=RegisteredResourceMeta):
 
     async def serialize_related(self, data: Any, many=False, *args, **kwargs) -> dict:
         """
-        Serializes related data as a JSON:API payload and returns a `dict`
-        which can be passed when calling `BaseResource.to_response`.
+        Serializes related data as a JSON:API payload and returns a ``dict``
+        which can be passed when calling :meth:`to_response`.
 
-        When serializing related resources, the related items are passed as `data` instead of the parent objects.
+        When serializing related resources, the related items are passed as ``data``,
+        instead of the parent objects.
 
-        Additional args and kwargs are passed to the `marshmallow` based Schema.
+        Additional args and kwargs are passed when initializing a new :attr:`schema`.
+
+        :param data: an object, or a sequence of objects to be serialized
+        :param many: whether multiple objects were passed
         """
         relationship = self.request_context['relationship']
         parent_id = self.request_context['id']
@@ -219,7 +282,6 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         related_route = f'{self.mount.name}:{relationship}'
         related_route_kwargs = {
             'id': parent_id,
-            # 'relationship': relationship,
         }
         if self.request_context.get('related_id'):
             related_route += '-id'
@@ -237,9 +299,9 @@ class BaseResource(metaclass=RegisteredResourceMeta):
 
     async def to_response(self, data: dict, meta: dict = None, *args, **kwargs) -> JSONAPIResponse:
         """
-        Wraps `data` in a JSONAPIResponse object and returns it.
-        If `meta` is specified, it will be included as the top level `meta` object in the json:api response.
-        Additional args and kwargs are passed to the `starlette` based Response.
+        Wraps ``data`` in a :class:`JSONAPIResponse` object and returns it.
+        If ``meta`` is specified, it will be included as the top level ``"meta"`` object in the json:api response.
+        Additional args and kwargs are passed when instantiating a new :class:`JSONAPIResponse`.
         """
         if meta:
             data = data.copy()
@@ -251,8 +313,8 @@ class BaseResource(metaclass=RegisteredResourceMeta):
 
     async def paginate_request(self, object_list: Sequence, pagination_kwargs: dict = None) -> Pagination:
         """
-        Apply pagination using the helper class defined on the resource
-        Additional parameters can pe saved on the `paginator` instance using pagination_kwargs
+        Applies pagination using the helper class defined by :attr:`pagination_class`.
+        Additional parameters can pe saved on the ``paginator`` instance using ``pagination_kwargs``.
         """
         if not self.pagination_class:
             raise Exception('Pagination class must be defined to use pagination')
@@ -264,6 +326,15 @@ class BaseResource(metaclass=RegisteredResourceMeta):
 
     @classmethod
     async def handle_error(cls, request: Request, exc: Exception) -> JSONAPIResponse:
+        """
+        Handles errors that may appear while a request is processed, to ensure the final response
+        is json:api compliant.
+
+        Subclasses should override this to add custom error handling.
+
+        :param request: current HTTP request
+        :param exc: encountered error
+        """
         if not isinstance(exc, HTTPException):
             logger.exception('Encountered an error while handling request.')
         return serialize_error(exc)
@@ -276,7 +347,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         """
         Handles a request by calling the appropriate handler.
         Additional args and kwargs are passed to the handler method,
-        which is usually one of: `get`, `patch`, `delete`, `get_many` or `post`.
+        which is usually one of: :meth:`get`, :meth:`patch`, :meth:`delete`, :meth:`get_many` or :meth:`post`.
         """
         request_context = request_context or {}
         if extract_id:
@@ -304,7 +375,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
 
     @classmethod
     async def handle_get_related(cls, request: Request, relationship: str = None):
-        """ Handles related resources requests, such as /articles/1/author. """
+        """ Handles related resources requests, such as ``GET /articles/1/author``. """
         related_id = request.path_params.get('related_id')
         request_context = {'relationship': relationship, 'related_id': related_id}
         return await cls.handle_request(
@@ -316,6 +387,9 @@ class BaseResource(metaclass=RegisteredResourceMeta):
 
     @classmethod
     def register_routes(cls, app: Starlette, base_path: str):
+        """
+        Registers URL routes associated to this resource.
+        """
         if not cls.type_ or not cls.schema:
             raise Exception('Cannot register a resource without specifying its `type_` and its `schema`.')
 
@@ -385,9 +459,11 @@ class BaseResource(metaclass=RegisteredResourceMeta):
 
         app.routes.append(cls.mount)
 
-    # Methods used to generate compound documents
-    # https://jsonapi.org/format/#document-compound-documents
     async def _prepare_included(self, data: Any, many: bool) -> Optional[List[str]]:
+        """
+        Processes the ``include`` query parameter and calls :meth:`prepare_relations`
+        for every object in ``data``, to enable requests for compound documents.
+        """
         include_param = parse_included_params(self.request)
         if not include_param:
             return None
@@ -405,12 +481,12 @@ class BaseResource(metaclass=RegisteredResourceMeta):
                 return None
         return include_param_list
 
-    # Methods used to implement sparse fields
-    # https://jsonapi.org/format/#fetching-sparse-fieldsets
     async def process_sparse_fields(self, serialized_data: dict, many: bool = False) -> dict:
         """
-        Processes sparse fields requests by cleaning the serialized
-        data of extra attributes and relationships.
+        Processes sparse fields requests by removing extra attributes
+        and relationships from the serialized data.
+
+        `<https://jsonapi.org/format/#fetching-sparse-fieldsets>`_
         """
         sparse_fields = parse_sparse_fields_params(self.request)
         if not sparse_fields or not serialized_data.get('data'):
