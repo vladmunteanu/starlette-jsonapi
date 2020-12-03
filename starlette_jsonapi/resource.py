@@ -1,4 +1,5 @@
 import logging
+from functools import wraps
 from typing import Type, Any, List, Optional, Union, Sequence, Dict
 
 from marshmallow.exceptions import ValidationError
@@ -739,6 +740,7 @@ def _partial(*args, **kwargs):
     https://github.com/encode/starlette/pull/1106
     """
     def outer(f):
+        @wraps(f)
         async def inner(request: Request):
             return await f(request=request, *args, **kwargs)
         return inner
