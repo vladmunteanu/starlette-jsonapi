@@ -1,4 +1,8 @@
+import json
 import logging
+from asyncio import Future
+from typing import Any
+from unittest import mock
 
 import pytest
 from marshmallow_jsonapi import fields
@@ -780,3 +784,113 @@ def test_relationship_resource_top_level_meta(app: Starlette):
         },
         'meta': {'some-meta-attribute': 'some-meta-value'},
     }
+
+
+@pytest.mark.asyncio
+async def test_relationship_resource_before_request_called(monkeypatch):
+    f = Future()  # type: Future
+    f.set_result('foo')
+    fake_before_request = mock.MagicMock(return_value=f)
+    fake_request = mock.MagicMock()
+    fake_request.method = 'GET'
+    fake_request.path_params = {'parent_id': '123'}
+
+    class TRelationshipResource(BaseRelationshipResource):
+        pass
+
+    monkeypatch.setattr(TRelationshipResource, 'before_request', fake_before_request)
+
+    assert fake_before_request.call_count == 0
+
+    await TRelationshipResource.handle_request(fake_request)
+
+    assert fake_before_request.call_count == 1
+    assert fake_before_request.call_args_list[0][1] == {
+        'request': fake_request,
+        'request_context': {},
+    }
+
+
+@pytest.mark.asyncio
+async def test_relationship_resource_before_request_error_caught(monkeypatch):
+    f = Future()  # type: Future
+    f.set_exception(Exception('foo'))
+    fake_before_request = mock.MagicMock(return_value=f)
+    fake_request = mock.MagicMock()
+    fake_request.path_params = {'parent_id': '123'}
+
+    class TRelationshipResource(BaseRelationshipResource):
+        pass
+
+    monkeypatch.setattr(TRelationshipResource, 'before_request', fake_before_request)
+
+    assert fake_before_request.call_count == 0
+    resp = await TRelationshipResource.handle_request(fake_request)
+    assert fake_before_request.call_count == 1
+
+    assert json.loads(resp.body)['errors'] == [{'detail': 'Internal server error'}]
+    assert resp.status_code == 500
+
+
+@pytest.mark.asyncio
+async def test_relationship_resource_after_request_called(monkeypatch):
+    f = Future()  # type: Future
+    f.set_result('foo')
+    fake_after_request = mock.MagicMock(return_value=f)
+    fake_request = mock.MagicMock()
+    fake_request.method = 'GET'
+    fake_request.path_params = {'parent_id': '123'}
+    fake_response = mock.MagicMock()
+
+    class TRelationshipResource(BaseRelationshipResource):
+
+        async def get(self, parent_id, *args, **kwargs) -> Response:
+            return fake_response
+
+    monkeypatch.setattr(TRelationshipResource, 'after_request', fake_after_request)
+
+    assert fake_after_request.call_count == 0
+    await TRelationshipResource.handle_request(fake_request)
+    assert fake_after_request.call_count == 1
+    assert fake_after_request.call_args_list[0][1] == {
+        'request': fake_request,
+        'request_context': {},
+        'response': fake_response,
+    }
+
+    # check that after_request is called when an exception is raised
+    class TBuggyResource(BaseRelationshipResource):
+
+        async def get(self, parent_id, *args, **kwargs) -> Response:
+            raise Exception('something bad happened')
+
+    monkeypatch.setattr(TBuggyResource, 'after_request', fake_after_request)
+
+    assert fake_after_request.call_count == 1
+    r = await TBuggyResource.handle_request(fake_request)
+    assert r.status_code == 500
+    assert fake_after_request.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_relationship_resource_after_request_error_caught(monkeypatch):
+    f = Future()  # type: Future
+    f.set_exception(Exception('foo'))
+    fake_after_request = mock.MagicMock(return_value=f)
+    fake_request = mock.MagicMock()
+    fake_request.method = 'GET'
+    fake_request.path_params = {'parent_id': '123'}
+
+    class TRelationshipResource(BaseRelationshipResource):
+
+        async def get(self, parent_id: Any, *args, **kwargs) -> Response:
+            return Response(status_code=200)
+
+    monkeypatch.setattr(TRelationshipResource, 'after_request', fake_after_request)
+
+    assert fake_after_request.call_count == 0
+    resp = await TRelationshipResource.handle_request(fake_request)
+    assert fake_after_request.call_count == 1
+
+    assert resp.status_code == 500
+    assert json.loads(resp.body)['errors'] == [{'detail': 'Internal server error'}]

@@ -1,4 +1,3 @@
-import functools
 import logging
 from typing import Type, Any, List, Optional, Union, Sequence, Dict
 
@@ -15,8 +14,7 @@ from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
 from starlette_jsonapi.pagination import BasePagination, Pagination
 from starlette_jsonapi.utils import (
-    parse_included_params,
-    parse_sparse_fields_params, filter_sparse_fields,
+    parse_included_params, parse_sparse_fields_params, filter_sparse_fields,
     serialize_error,
 )
 
@@ -34,10 +32,11 @@ class BaseResource(metaclass=RegisteredResourceMeta):
 
         - requests for compound documents (Example: ``GET /api/v1/articles?include=author``) can be
           supported by overriding :meth:`prepare_relations` to pre-populate
-          the relationship objects before serializing.
+          the related objects before serializing.
 
         - requests for related objects (Example: ``GET /api/v1/articles/123/author``), can be supported
-          by overriding :meth:`get_related`, then serializing with :meth:`serialize_related`.
+          by overriding the :meth:`get_related` handler.
+          Related objects should be serialized with :meth:`serialize_related`.
 
     By default, requests for sparse fields will be handled by the :class:`BaseResource` implementation,
     without any effort required.
@@ -203,15 +202,28 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         return
 
     async def deserialize_body(self, partial=None) -> dict:
-        """ Returns the request body parsed according to :attr:`schema`."""
+        """
+        Deserializes the request body according to :attr:`schema`.
+
+        :param partial: Can be set to ``True`` during PATCH requests, to ignore missing fields.
+                        For more advanced uses, like a specific iterable of missing fields,
+                        you should check the marshmallow documentation.
+        :raises: :exc:`starlette_jsonapi.exceptions.JSONAPIException`
+        """
         raw_body = await self.validate_body(partial=partial)
         deserialized_body = self.schema(app=self.request.app).load(raw_body, partial=partial)
         return deserialized_body
 
     async def validate_body(self, partial=None) -> dict:
         """
-        Validates the raw request body, raising :class:`JSONAPIException` 400 errors if the body is not valid.
-        Otherwise, the whole request body is loaded and returned.
+        Validates the raw request body, raising :exc:`JSONAPIException` 400 errors
+        if the body is not valid according to :attr:`schema`.
+        Otherwise, the whole request body is loaded as a ``dict`` and returned.
+
+        :param partial: Can be set to ``True`` during PATCH requests, to ignore missing fields.
+                        For more advanced uses, like a specific iterable of missing fields,
+                        you should check the marshmallow documentation.
+        :raises: :exc:`starlette_jsonapi.exceptions.JSONAPIException`
         """
         content_type = self.request.headers.get('content-type')
         if self.request.method in ('POST', 'PATCH') and content_type != 'application/vnd.api+json':
@@ -299,9 +311,13 @@ class BaseResource(metaclass=RegisteredResourceMeta):
 
     async def to_response(self, data: dict, meta: dict = None, *args, **kwargs) -> JSONAPIResponse:
         """
-        Wraps ``data`` in a :class:`JSONAPIResponse` object and returns it.
+        Wraps ``data`` in a :class:`starlette_jsonapi.responses.JSONAPIResponse` object and returns it.
         If ``meta`` is specified, it will be included as the top level ``"meta"`` object in the json:api response.
         Additional args and kwargs are passed when instantiating a new :class:`JSONAPIResponse`.
+
+        :param data: Serialized resources / errors, as returned by
+                     :meth:`serialize`, :meth:`serialize_related` or :func:`starlette_jsonapi.utils.serialize_error`
+        :param meta: Optional dictionary with meta information. Overwrites any existing top level `meta` in ``data``.
         """
         if meta:
             data = data.copy()
@@ -325,14 +341,15 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         return pagination
 
     @classmethod
-    async def handle_error(cls, request: Request, exc: Exception) -> JSONAPIResponse:
+    async def handle_error(cls, request: Request, request_context: dict, exc: Exception) -> JSONAPIResponse:
         """
-        Handles errors that may appear while a request is processed, to ensure the final response
-        is json:api compliant.
+        Handles errors that may appear while a request is processed, taking care of serializing them
+        to ensure the final response is json:api compliant.
 
-        Subclasses should override this to add custom error handling.
+        Subclasses can override this to add custom error handling.
 
         :param request: current HTTP request
+        :param request_context: current request context
         :param exc: encountered error
         """
         if not isinstance(exc, HTTPException):
@@ -356,20 +373,26 @@ class BaseResource(metaclass=RegisteredResourceMeta):
             request_context.update({'id': id_})
 
         # run before request hook
-        await cls.before_request(request=request, request_context=request_context)
-
-        # safely execute the handler
         try:
-            if request.method not in cls.allowed_methods:
-                raise JSONAPIException(status_code=405)
-            resource = cls(request, request_context=request_context)
-            handler = getattr(resource, handler_name, None)
-            response = await handler(*args, **kwargs)  # type: Response
-        except Exception as e:
-            response = await cls.handle_error(request=request, exc=e)
+            await cls.before_request(request=request, request_context=request_context)
+        except Exception as before_request_exc:
+            response: Response = await cls.handle_error(request, request_context, exc=before_request_exc)
+        else:
+            # safely execute the handler
+            try:
+                if request.method not in cls.allowed_methods:
+                    raise JSONAPIException(status_code=405)
+                resource = cls(request, request_context)
+                handler = getattr(resource, handler_name, None)
+                response = await handler(*args, **kwargs)
+            except Exception as e:
+                response = await cls.handle_error(request, request_context, exc=e)
 
-        # run after request hook
-        await cls.after_request(request=request, request_context=request_context, response=response)
+            # run after request hook
+            try:
+                await cls.after_request(request=request, request_context=request_context, response=response)
+            except Exception as after_request_exc:
+                response = await cls.handle_error(request, request_context, exc=after_request_exc)
 
         return response
 
@@ -404,7 +427,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         routes = [
             Route(
                 '/{{id:{}}}/{}/{{related_id:{}}}'.format(cls.id_mask, rel_name, rel_class.id_mask),
-                functools.partial(cls.handle_get_related, relationship=rel_name),
+                _partial(relationship=rel_name)(cls.handle_get_related),
                 methods=['GET'],
                 name=f'{rel_name}-id',
             )
@@ -414,7 +437,7 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         routes += [
             Route(
                 '/{{id:{}}}/{}'.format(cls.id_mask, rel_name),
-                functools.partial(cls.handle_get_related, relationship=rel_name),
+                _partial(relationship=rel_name)(cls.handle_get_related),
                 methods=['GET'],
                 name=rel_name,
             )
@@ -425,27 +448,27 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         routes += [
             Route(
                 '/{{id:{}}}'.format(cls.id_mask),
-                functools.partial(cls.handle_request, 'get', extract_id=True),
+                _partial('get', extract_id=True)(cls.handle_request),
                 methods=['GET'], name='get',
             ),
             Route(
                 '/{{id:{}}}'.format(cls.id_mask),
-                functools.partial(cls.handle_request, 'patch', extract_id=True),
+                _partial('patch', extract_id=True)(cls.handle_request),
                 methods=['PATCH'], name='patch',
             ),
             Route(
                 '/{{id:{}}}'.format(cls.id_mask),
-                functools.partial(cls.handle_request, 'delete', extract_id=True),
+                _partial('delete', extract_id=True)(cls.handle_request),
                 methods=['DELETE'], name='delete',
             ),
             Route(
                 '/',
-                functools.partial(cls.handle_request, 'get_many'),
+                _partial('get_many')(cls.handle_request),
                 methods=['GET'], name='get_many',
             ),
             Route(
                 '/',
-                functools.partial(cls.handle_request, 'post'),
+                _partial('post')(cls.handle_request),
                 methods=['POST'], name='post',
             ),
         ]
@@ -648,7 +671,7 @@ class BaseRelationshipResource:
         return deserialized_ids
 
     @classmethod
-    async def handle_error(cls, request: Request, exc: Exception) -> JSONAPIResponse:
+    async def handle_error(cls, request: Request, request_context: dict, exc: Exception) -> JSONAPIResponse:
         if not isinstance(exc, HTTPException):
             logger.exception('Encountered an error while handling request.')
         return serialize_error(exc)
@@ -662,20 +685,26 @@ class BaseRelationshipResource:
         """
         request_context = request_context or {}
         # run before request hook
-        await cls.before_request(request=request, request_context=request_context)
-
         try:
-            if request.method not in cls.allowed_methods:
-                raise JSONAPIException(status_code=405)
-            kwargs.update(parent_id=request.path_params['parent_id'])
-            resource = cls(request, request_context=request_context)
-            handler = getattr(resource, request.method.lower(), None)
-            response = await handler(*args, **kwargs)  # type: Response
-        except Exception as e:
-            response = await cls.handle_error(request=request, exc=e)
+            await cls.before_request(request=request, request_context=request_context)
+        except Exception as before_request_exc:
+            response: Response = await cls.handle_error(request, request_context, exc=before_request_exc)
+        else:
+            try:
+                if request.method not in cls.allowed_methods:
+                    raise JSONAPIException(status_code=405)
+                kwargs.update(parent_id=request.path_params['parent_id'])
+                resource = cls(request, request_context=request_context)
+                handler = getattr(resource, request.method.lower(), None)
+                response = await handler(*args, **kwargs)
+            except Exception as e:
+                response = await cls.handle_error(request, request_context, exc=e)
 
-        # run after request hook
-        await cls.after_request(request=request, request_context=request_context, response=response)
+            # run after request hook
+            try:
+                await cls.after_request(request=request, request_context=request_context, response=response)
+            except Exception as after_request_exc:
+                response = await cls.handle_error(request, request_context, exc=after_request_exc)
 
         return response
 
@@ -701,3 +730,16 @@ class BaseRelationshipResource:
                 methods=['GET', 'POST', 'PATCH', 'DELETE'],
             )
         )
+
+
+def _partial(*args, **kwargs):
+    """
+    This is a temporary partial, since we cannot use functools......partial with Starlette due to asyncio bugs.
+    https://github.com/encode/starlette/pull/984
+    https://github.com/encode/starlette/pull/1106
+    """
+    def outer(f):
+        async def inner(request: Request):
+            return await f(request=request, *args, **kwargs)
+        return inner
+    return outer

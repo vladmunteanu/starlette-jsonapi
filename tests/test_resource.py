@@ -1,3 +1,4 @@
+import json
 import logging
 import uuid
 from asyncio import Future
@@ -882,3 +883,48 @@ async def test_after_request_called(monkeypatch):
     r = await TBuggyResource.handle_request('get', fake_request, extract_id=True)
     assert r.status_code == 500
     assert fake_after_request.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_before_request_error_caught(monkeypatch):
+    f = Future()  # type: Future
+    f.set_exception(Exception('foo'))
+    fake_before_request = mock.MagicMock(return_value=f)
+    fake_request = mock.MagicMock()
+    fake_request.path_params = {'id': '123'}
+
+    class TResource(BaseResource):
+        pass
+
+    monkeypatch.setattr(TResource, 'before_request', fake_before_request)
+
+    assert fake_before_request.call_count == 0
+    resp = await TResource.handle_request('get', fake_request, extract_id=True)
+    assert fake_before_request.call_count == 1
+
+    assert resp.status_code == 500
+    assert json.loads(resp.body)['errors'] == [{'detail': 'Internal server error'}]
+
+
+@pytest.mark.asyncio
+async def test_after_request_error_caught(monkeypatch):
+    f = Future()  # type: Future
+    f.set_exception(Exception('foo'))
+    fake_after_request = mock.MagicMock(return_value=f)
+    fake_request = mock.MagicMock()
+    fake_request.method = 'GET'
+    fake_request.path_params = {'id': '123'}
+
+    class TResource(BaseResource):
+
+        async def get(self, id=None, *args, **kwargs) -> Response:
+            return Response(status_code=200)
+
+    monkeypatch.setattr(TResource, 'after_request', fake_after_request)
+
+    assert fake_after_request.call_count == 0
+    resp = await TResource.handle_request('get', fake_request, extract_id=True)
+    assert fake_after_request.call_count == 1
+
+    assert resp.status_code == 500
+    assert json.loads(resp.body)['errors'] == [{'detail': 'Internal server error'}]
