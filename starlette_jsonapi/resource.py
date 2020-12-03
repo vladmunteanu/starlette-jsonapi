@@ -22,8 +22,11 @@ from starlette_jsonapi.utils import (
 logger = logging.getLogger(__name__)
 
 
-class BaseResourceHandler:
-    """ Base class for json:api resource handlers. """
+class _BaseResourceHandler:
+    """
+    Base implementation of common json:api resource handler logic.
+    You should look at BaseResource or BaseRelationshipResource instead.
+    """
 
     #: High level filter for HTTP requests.
     #: If you specify a smaller subset, any request with a method
@@ -150,7 +153,7 @@ class BaseResourceHandler:
         return response
 
 
-class BaseResource(BaseResourceHandler, metaclass=RegisteredResourceMeta):
+class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
     """A basic json:api resource implementation, data layer agnostic.
 
     Subclasses can achieve basic functionality by implementing:
@@ -559,7 +562,7 @@ class _StopInclude(Exception):
     pass
 
 
-class BaseRelationshipResource(BaseResourceHandler):
+class BaseRelationshipResource(_BaseResourceHandler):
     """ A basic json:api relationships resource implementation, data layer agnostic. """
 
     #: The parent resource that this relationship belongs to
