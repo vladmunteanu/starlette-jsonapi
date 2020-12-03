@@ -490,9 +490,6 @@ def test_method_not_allowed_relationship_resource(app: Starlette):
     test_client = TestClient(app)
     rv = test_client.get('/test-resource/foo/relationships/rel')
     assert rv.status_code == 405
-    assert rv.json() == {
-        'errors': [{'detail': 'Method Not Allowed'}]
-    }
 
 
 def test_relationship_resource_register_routes_missing_parent_type(app: Starlette):
@@ -802,7 +799,7 @@ async def test_relationship_resource_before_request_called(monkeypatch):
 
     assert fake_before_request.call_count == 0
 
-    await TRelationshipResource.handle_request(fake_request)
+    await TRelationshipResource.handle_request('get', fake_request)
 
     assert fake_before_request.call_count == 1
     assert fake_before_request.call_args_list[0][1] == {
@@ -825,7 +822,7 @@ async def test_relationship_resource_before_request_error_caught(monkeypatch):
     monkeypatch.setattr(TRelationshipResource, 'before_request', fake_before_request)
 
     assert fake_before_request.call_count == 0
-    resp = await TRelationshipResource.handle_request(fake_request)
+    resp = await TRelationshipResource.handle_request('get', fake_request)
     assert fake_before_request.call_count == 1
 
     assert json.loads(resp.body)['errors'] == [{'detail': 'Internal server error'}]
@@ -850,11 +847,11 @@ async def test_relationship_resource_after_request_called(monkeypatch):
     monkeypatch.setattr(TRelationshipResource, 'after_request', fake_after_request)
 
     assert fake_after_request.call_count == 0
-    await TRelationshipResource.handle_request(fake_request)
+    await TRelationshipResource.handle_request('get', fake_request, extract_params=['parent_id'])
     assert fake_after_request.call_count == 1
     assert fake_after_request.call_args_list[0][1] == {
         'request': fake_request,
-        'request_context': {},
+        'request_context': {'parent_id': '123'},
         'response': fake_response,
     }
 
@@ -867,7 +864,7 @@ async def test_relationship_resource_after_request_called(monkeypatch):
     monkeypatch.setattr(TBuggyResource, 'after_request', fake_after_request)
 
     assert fake_after_request.call_count == 1
-    r = await TBuggyResource.handle_request(fake_request)
+    r = await TBuggyResource.handle_request('get', fake_request, extract_params=['parent_id'])
     assert r.status_code == 500
     assert fake_after_request.call_count == 2
 
@@ -889,7 +886,7 @@ async def test_relationship_resource_after_request_error_caught(monkeypatch):
     monkeypatch.setattr(TRelationshipResource, 'after_request', fake_after_request)
 
     assert fake_after_request.call_count == 0
-    resp = await TRelationshipResource.handle_request(fake_request)
+    resp = await TRelationshipResource.handle_request('get', fake_request)
     assert fake_after_request.call_count == 1
 
     assert resp.status_code == 500

@@ -5,3 +5,5 @@ starlette\_jsonapi.resource module
    :members:
    :undoc-members:
    :show-inheritance:
+   :inherited-members:
+   :exclude-members: BaseResourceHandler

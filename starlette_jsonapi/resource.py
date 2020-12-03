@@ -22,7 +22,135 @@ from starlette_jsonapi.utils import (
 logger = logging.getLogger(__name__)
 
 
-class BaseResource(metaclass=RegisteredResourceMeta):
+class BaseResourceHandler:
+    """ Base class for json:api resource handlers. """
+
+    #: High level filter for HTTP requests.
+    #: If you specify a smaller subset, any request with a method
+    #: not listed here will result in a 405 error.
+    allowed_methods = {'GET', 'PATCH', 'POST', 'DELETE'}
+
+    #: Instance attribute representing the current HTTP request.
+    request: Request
+
+    #: Instance attribute representing the context of the current HTTP request.
+    #: Can be used to store additional information for the duration of a request.
+    request_context: dict
+
+    def __init__(self, request: Request, request_context: dict, *args, **kwargs) -> None:
+        """
+        A Resource instance is created for each HTTP request,
+        and the :class:`starlette.requests.Request`
+        is passed, as well as the context, which can be used to store information
+        without altering the request object.
+        """
+        self.request: Request = request
+        self.request_context: dict = request_context
+
+    @classmethod
+    async def before_request(cls, request: Request, request_context: dict) -> None:
+        """
+        Optional hook that can be implemented by subclasses to execute logic before a request is handled.
+        This will not run if an exception is raised before :meth:`handle_request` is called.
+
+        For more advanced hooks, check starlette middleware.
+
+        :param request: The current HTTP request
+        :param request_context: The current request's context.
+        """
+        return
+
+    @classmethod
+    async def after_request(cls, request: Request, request_context: dict, response: Response) -> None:
+        """
+        Optional hook that can be implemented by subclasses to execute logic after a request is handled.
+        This will not run if an exception is raised before :meth:`handle_request` is called.
+
+        For more advanced hooks, check starlette middleware.
+
+        :param request: The current HTTP request
+        :param request_context: The current request's context.
+        :param response: The Starlette Response object
+        """
+        return
+
+    @classmethod
+    async def handle_error(cls, request: Request, request_context: dict, exc: Exception) -> JSONAPIResponse:
+        """
+        Handles errors that may appear while a request is processed, taking care of serializing them
+        to ensure the final response is json:api compliant.
+
+        Subclasses can override this to add custom error handling.
+
+        :param request: current HTTP request
+        :param request_context: current request context
+        :param exc: encountered error
+        """
+        if not isinstance(exc, HTTPException):
+            logger.exception('Encountered an error while handling request.')
+        return serialize_error(exc)
+
+    async def to_response(self, data: dict, meta: dict = None, *args, **kwargs) -> JSONAPIResponse:
+        """
+        Wraps ``data`` in a :class:`starlette_jsonapi.responses.JSONAPIResponse` object and returns it.
+        If ``meta`` is specified, it will be included as the top level ``"meta"`` object in the json:api response.
+        Additional args and kwargs are passed when instantiating a new :class:`JSONAPIResponse`.
+
+        :param data: Serialized resources / errors, as returned by
+                     :meth:`serialize`, :meth:`serialize_related` or :func:`starlette_jsonapi.utils.serialize_error`
+        :param meta: Optional dictionary with meta information. Overwrites any existing top level `meta` in ``data``.
+        """
+        if meta:
+            data = data.copy()
+            data.update(meta=meta)
+        return JSONAPIResponse(
+            content=data,
+            *args, **kwargs,
+        )
+
+    @classmethod
+    async def handle_request(
+        cls, handler_name: str, request: Request, request_context: dict = None,
+        extract_params: List[str] = None, *args, **kwargs
+    ) -> Response:
+        """
+        Handles a request by calling the appropriate handler.
+        Additional args and kwargs are passed to the handler method, which is usually one of:
+        :meth:`get`, :meth:`patch`, :meth:`delete`, :meth:`get_many` or :meth:`post`.
+        """
+        request_context = request_context or {}
+        extract_params = extract_params or []
+        for path_param in extract_params:
+            value = request.path_params.get(path_param)
+            kwargs.update({path_param: value})
+            request_context.update({path_param: value})
+
+        # run before request hook
+        try:
+            await cls.before_request(request=request, request_context=request_context)
+        except Exception as before_request_exc:
+            response: Response = await cls.handle_error(request, request_context, exc=before_request_exc)
+        else:
+            # safely execute the handler
+            try:
+                if request.method not in cls.allowed_methods:
+                    raise JSONAPIException(status_code=405)
+                resource = cls(request, request_context)
+                handler = getattr(resource, handler_name, None)
+                response = await handler(*args, **kwargs)
+            except Exception as e:
+                response = await cls.handle_error(request, request_context, exc=e)
+
+            # run after request hook
+            try:
+                await cls.after_request(request=request, request_context=request_context, response=response)
+            except Exception as after_request_exc:
+                response = await cls.handle_error(request, request_context, exc=after_request_exc)
+
+        return response
+
+
+class BaseResource(BaseResourceHandler, metaclass=RegisteredResourceMeta):
     """A basic json:api resource implementation, data layer agnostic.
 
     Subclasses can achieve basic functionality by implementing:
@@ -76,11 +204,6 @@ class BaseResource(metaclass=RegisteredResourceMeta):
     #: The json:api serializer, a subclass of :class:`JSONAPISchema`.
     schema: Type[JSONAPISchema] = JSONAPISchema
 
-    #: High level filter for HTTP requests.
-    #: If you specify a smaller subset, any request that specifies a method
-    #: not listed here will result in a 405 error.
-    allowed_methods = {'GET', 'PATCH', 'POST', 'DELETE'}
-
     #: By default `str`, but other options are documented in Starlette:
     #: ``'str', 'int', 'float', 'uuid', 'path'``
     id_mask: str = 'str'
@@ -118,17 +241,6 @@ class BaseResource(metaclass=RegisteredResourceMeta):
     #: This will be populated when routes are registered and we detect related resources.
     #: Used in :meth:`serialize_related`.
     _related: Dict[str, Type['BaseResource']]
-
-    def __init__(self, request: Request, request_context: dict, *args, **kwargs) -> None:
-        """
-        A Resource instance is created for each HTTP request, and the :class:`starlette.requests.Request`
-        is passed, as well as the context, which can be used to store information without altering the request object.
-        """
-        #: Instance attribute representing the current HTTP request.
-        self.request: Request = request
-        #: Instance attribute representing the context of the current HTTP request.
-        #: Can be used to store additional information for the duration of a request.
-        self.request_context: dict = request_context
 
     async def get(self, id: Any, *args, **kwargs) -> Response:
         """ Subclasses should implement this to handle ``GET /<id>`` requests. """
@@ -174,33 +286,6 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         :param relations: list of relations described above
         """
         raise _StopInclude
-
-    @classmethod
-    async def before_request(cls, request: Request, request_context: dict) -> None:
-        """
-        Optional hook that can be implemented by subclasses to execute logic before a request is handled.
-        This will not run if an exception is raised before :meth:`handle_request` is called.
-
-        For more advanced hooks, check starlette middleware.
-
-        :param request: The current HTTP request
-        :param request_context: The current request's context.
-        """
-        return
-
-    @classmethod
-    async def after_request(cls, request: Request, request_context: dict, response: Response) -> None:
-        """
-        Optional hook that can be implemented by subclasses to execute logic after a request is handled.
-        This will not run if an exception is raised before :meth:`handle_request` is called.
-
-        For more advanced hooks, check starlette middleware.
-
-        :param request: The current HTTP request
-        :param request_context: The current request's context.
-        :param response: The Starlette Response object
-        """
-        return
 
     async def deserialize_body(self, partial=None) -> dict:
         """
@@ -310,24 +395,6 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         sparse_body = await self.process_sparse_fields(body, many=many)
         return sparse_body
 
-    async def to_response(self, data: dict, meta: dict = None, *args, **kwargs) -> JSONAPIResponse:
-        """
-        Wraps ``data`` in a :class:`starlette_jsonapi.responses.JSONAPIResponse` object and returns it.
-        If ``meta`` is specified, it will be included as the top level ``"meta"`` object in the json:api response.
-        Additional args and kwargs are passed when instantiating a new :class:`JSONAPIResponse`.
-
-        :param data: Serialized resources / errors, as returned by
-                     :meth:`serialize`, :meth:`serialize_related` or :func:`starlette_jsonapi.utils.serialize_error`
-        :param meta: Optional dictionary with meta information. Overwrites any existing top level `meta` in ``data``.
-        """
-        if meta:
-            data = data.copy()
-            data.update(meta=meta)
-        return JSONAPIResponse(
-            content=data,
-            *args, **kwargs,
-        )
-
     async def paginate_request(self, object_list: Sequence, pagination_kwargs: dict = None) -> Pagination:
         """
         Applies pagination using the helper class defined by :attr:`pagination_class`.
@@ -340,74 +407,6 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         paginator = self.pagination_class(request=self.request, data=object_list, **pagination_kwargs)
         pagination = paginator.get_pagination()
         return pagination
-
-    @classmethod
-    async def handle_error(cls, request: Request, request_context: dict, exc: Exception) -> JSONAPIResponse:
-        """
-        Handles errors that may appear while a request is processed, taking care of serializing them
-        to ensure the final response is json:api compliant.
-
-        Subclasses can override this to add custom error handling.
-
-        :param request: current HTTP request
-        :param request_context: current request context
-        :param exc: encountered error
-        """
-        if not isinstance(exc, HTTPException):
-            logger.exception('Encountered an error while handling request.')
-        return serialize_error(exc)
-
-    @classmethod
-    async def handle_request(
-            cls, handler_name: str, request: Request, request_context: dict = None,
-            extract_id: bool = False, *args, **kwargs
-    ) -> Response:
-        """
-        Handles a request by calling the appropriate handler.
-        Additional args and kwargs are passed to the handler method,
-        which is usually one of: :meth:`get`, :meth:`patch`, :meth:`delete`, :meth:`get_many` or :meth:`post`.
-        """
-        request_context = request_context or {}
-        if extract_id:
-            id_ = request.path_params.get('id')
-            kwargs.update({'id': id_})
-            request_context.update({'id': id_})
-
-        # run before request hook
-        try:
-            await cls.before_request(request=request, request_context=request_context)
-        except Exception as before_request_exc:
-            response: Response = await cls.handle_error(request, request_context, exc=before_request_exc)
-        else:
-            # safely execute the handler
-            try:
-                if request.method not in cls.allowed_methods:
-                    raise JSONAPIException(status_code=405)
-                resource = cls(request, request_context)
-                handler = getattr(resource, handler_name, None)
-                response = await handler(*args, **kwargs)
-            except Exception as e:
-                response = await cls.handle_error(request, request_context, exc=e)
-
-            # run after request hook
-            try:
-                await cls.after_request(request=request, request_context=request_context, response=response)
-            except Exception as after_request_exc:
-                response = await cls.handle_error(request, request_context, exc=after_request_exc)
-
-        return response
-
-    @classmethod
-    async def handle_get_related(cls, request: Request, relationship: str = None):
-        """ Handles related resources requests, such as ``GET /articles/1/author``. """
-        related_id = request.path_params.get('related_id')
-        request_context = {'relationship': relationship, 'related_id': related_id}
-        return await cls.handle_request(
-            handler_name='get_related', request=request,
-            relationship=relationship, related_id=related_id,
-            request_context=request_context,
-            extract_id=True,
-        )
 
     @classmethod
     def register_routes(cls, app: Starlette, base_path: str):
@@ -428,7 +427,12 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         routes = [
             Route(
                 '/{{id:{}}}/{}/{{related_id:{}}}'.format(cls.id_mask, rel_name, rel_class.id_mask),
-                _partial(relationship=rel_name)(cls.handle_get_related),
+                _partial(
+                    'get_related',
+                    relationship=rel_name,
+                    extract_params=['id', 'related_id'],
+                    request_context={'relationship': rel_name},
+                )(cls.handle_request),
                 methods=['GET'],
                 name=f'{rel_name}-id',
             )
@@ -438,7 +442,12 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         routes += [
             Route(
                 '/{{id:{}}}/{}'.format(cls.id_mask, rel_name),
-                _partial(relationship=rel_name)(cls.handle_get_related),
+                _partial(
+                    'get_related',
+                    relationship=rel_name,
+                    extract_params=['id', 'related_id'],
+                    request_context={'relationship': rel_name},
+                )(cls.handle_request),
                 methods=['GET'],
                 name=rel_name,
             )
@@ -449,17 +458,17 @@ class BaseResource(metaclass=RegisteredResourceMeta):
         routes += [
             Route(
                 '/{{id:{}}}'.format(cls.id_mask),
-                _partial('get', extract_id=True)(cls.handle_request),
+                _partial('get', extract_params=['id'])(cls.handle_request),
                 methods=['GET'], name='get',
             ),
             Route(
                 '/{{id:{}}}'.format(cls.id_mask),
-                _partial('patch', extract_id=True)(cls.handle_request),
+                _partial('patch', extract_params=['id'])(cls.handle_request),
                 methods=['PATCH'], name='patch',
             ),
             Route(
                 '/{{id:{}}}'.format(cls.id_mask),
-                _partial('delete', extract_id=True)(cls.handle_request),
+                _partial('delete', extract_params=['id'])(cls.handle_request),
                 methods=['DELETE'], name='delete',
             ),
             Route(
@@ -550,20 +559,14 @@ class _StopInclude(Exception):
     pass
 
 
-class BaseRelationshipResource:
+class BaseRelationshipResource(BaseResourceHandler):
     """ A basic json:api relationships resource implementation, data layer agnostic. """
-    # The parent resource that this relationship belongs to
-    parent_resource: Type[BaseResource]
-    # The relationship name, as found on the parent resource schema
-    relationship_name: str
-    # High level filter for HTTP requests.
-    # If you specify a smaller subset, any request that specifies a method
-    # not listed here will result in a 405 error.
-    allowed_methods = {'GET', 'PATCH', 'POST', 'DELETE'}
 
-    def __init__(self, request: Request, request_context: dict, *args, **kwargs) -> None:
-        self.request = request
-        self.request_context = request_context
+    #: The parent resource that this relationship belongs to
+    parent_resource: Type[BaseResource]
+
+    #: The relationship name, as found on the parent resource schema
+    relationship_name: str
 
     async def post(self, parent_id: Any, *args, **kwargs) -> Response:
         """ Subclasses should implement this to handle POST /<parent_id>/relationships/<relationship> requests. """
@@ -580,33 +583,6 @@ class BaseRelationshipResource:
     async def delete(self, parent_id: Any, *args, **kwargs) -> Response:
         """ Subclasses should implement this to handle DELETE /<parent_id>/relationships/<relationship> requests. """
         raise JSONAPIException(status_code=405)
-
-    @classmethod
-    async def before_request(cls, request: Request, request_context: dict) -> None:
-        """
-        Optional hook that can be implemented by subclasses to execute logic before a request is handled.
-        This will not run if an exception is raised before `handle_request` is called.
-
-        For more advanced hooks, check starlette middleware.
-
-        :param request: The Starlette Request object
-        :param request_context: The current request's context.
-        """
-        return
-
-    @classmethod
-    async def after_request(cls, request: Request, request_context: dict, response: Response) -> None:
-        """
-        Optional hook that can be implemented by subclasses to execute logic after a request is handled.
-        This will not run if an exception is raised before `handle_request` is called.
-
-        For more advanced hooks, check starlette middleware.
-
-        :param request: The Starlette Request object
-        :param request_context: The current request's context.
-        :param response: The Starlette Response object
-        """
-        return
 
     def _get_relationship_field(self) -> JSONAPIRelationship:
         """ Returns the relationship field defined on the parent resource schema. """
@@ -625,20 +601,6 @@ class BaseRelationshipResource:
         relationship = self._get_relationship_field()
         body = relationship.serialize(self.relationship_name, data)
         return body
-
-    async def to_response(self, data: dict, meta: dict = None, *args, **kwargs) -> JSONAPIResponse:
-        """
-        Wraps `data` in a JSONAPIResponse object and returns it.
-        If `meta` is specified, it will be included as the top level `meta` object in the json:api response.
-        Additional args and kwargs are passed to the `starlette` based Response.
-        """
-        if meta:
-            data = data.copy()
-            data.update(meta=meta)
-        return JSONAPIResponse(
-            content=data,
-            *args, **kwargs,
-        )
 
     async def deserialize_ids(self) -> Union[None, str, List[str]]:
         """
@@ -672,45 +634,11 @@ class BaseRelationshipResource:
         return deserialized_ids
 
     @classmethod
-    async def handle_error(cls, request: Request, request_context: dict, exc: Exception) -> JSONAPIResponse:
-        if not isinstance(exc, HTTPException):
-            logger.exception('Encountered an error while handling request.')
-        return serialize_error(exc)
-
-    @classmethod
-    async def handle_request(cls, request: Request, request_context: dict = None, *args, **kwargs) -> Response:
-        """
-        Handles a request by calling the appropriate handler based on the request method.
-        Additional args and kwargs are passed to the handler method,
-        which is usually one of: `get`, `patch`, `delete`, or `post`.
-        """
-        request_context = request_context or {}
-        # run before request hook
-        try:
-            await cls.before_request(request=request, request_context=request_context)
-        except Exception as before_request_exc:
-            response: Response = await cls.handle_error(request, request_context, exc=before_request_exc)
-        else:
-            try:
-                if request.method not in cls.allowed_methods:
-                    raise JSONAPIException(status_code=405)
-                kwargs.update(parent_id=request.path_params['parent_id'])
-                resource = cls(request, request_context=request_context)
-                handler = getattr(resource, request.method.lower(), None)
-                response = await handler(*args, **kwargs)
-            except Exception as e:
-                response = await cls.handle_error(request, request_context, exc=e)
-
-            # run after request hook
-            try:
-                await cls.after_request(request=request, request_context=request_context, response=response)
-            except Exception as after_request_exc:
-                response = await cls.handle_error(request, request_context, exc=after_request_exc)
-
-        return response
-
-    @classmethod
     def register_routes(cls, *args, **kwargs):
+        """
+        Registers URL routes associated to this resource.
+        Should be called after calling register_routes for the parent resource.
+        """
         if not cls.parent_resource.type_:
             raise Exception(
                 'Cannot register a relationship resource if the `parent_resource` does not specify a `type_`.'
@@ -720,17 +648,18 @@ class BaseRelationshipResource:
             raise Exception('Parent resource should be registered first.')
 
         name = f'relationships-{cls.relationship_name}'
-        cls.parent_resource.mount.routes.append(
-            Route(
-                name=name,
-                path='/{{parent_id:{}}}/relationships/{}'.format(
-                    cls.parent_resource.id_mask,
-                    cls.relationship_name
-                ),
-                endpoint=cls.handle_request,
-                methods=['GET', 'POST', 'PATCH', 'DELETE'],
+        for method in cls.allowed_methods:
+            cls.parent_resource.mount.routes.append(
+                Route(
+                    name=name,
+                    path='/{{parent_id:{}}}/relationships/{}'.format(
+                        cls.parent_resource.id_mask,
+                        cls.relationship_name
+                    ),
+                    endpoint=_partial(method.lower(), extract_params=['parent_id'])(cls.handle_request),
+                    methods=[method],
+                )
             )
-        )
 
 
 def _partial(*args, **kwargs):
