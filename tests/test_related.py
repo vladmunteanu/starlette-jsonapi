@@ -128,7 +128,8 @@ def test_relationship_resource(relationship_app: Starlette):
     assert rv.headers['Content-Type'] == 'application/vnd.api+json'
     assert rv.json() == {
         'errors': [
-            {'detail': 'Must include a `data` key'}
+            {'detail': 'Must include a `data` key'},
+            {'detail': 'Bad Request'},
         ]
     }
 
@@ -146,7 +147,8 @@ def test_relationship_resource(relationship_app: Starlette):
     assert rv.headers['Content-Type'] == 'application/vnd.api+json'
     assert rv.json() == {
         'errors': [
-            {'detail': 'Must have an `id` field'}
+            {'detail': 'Must have an `id` field'},
+            {'detail': 'Bad Request'},
         ]
     }
 
@@ -295,7 +297,8 @@ def test_relationship_many_resource(relationship_many_app: Starlette):
     assert rv.headers['Content-Type'] == 'application/vnd.api+json'
     assert rv.json() == {
         'errors': [
-            {'detail': 'Must include a `data` key'}
+            {'detail': 'Must include a `data` key'},
+            {'detail': 'Bad Request'},
         ]
     }
 
@@ -313,7 +316,8 @@ def test_relationship_many_resource(relationship_many_app: Starlette):
     assert rv.headers['Content-Type'] == 'application/vnd.api+json'
     assert rv.json() == {
         'errors': [
-            {'detail': 'Must have an `id` field'}
+            {'detail': 'Must have an `id` field'},
+            {'detail': 'Bad Request'},
         ]
     }
 
@@ -332,7 +336,8 @@ def test_relationship_many_resource(relationship_many_app: Starlette):
     assert rv.headers['Content-Type'] == 'application/vnd.api+json'
     assert rv.json() == {
         'errors': [
-            {'detail': 'Relationship is list-like'}
+            {'detail': 'Relationship is list-like'},
+            {'detail': 'Bad Request'},
         ]
     }
 

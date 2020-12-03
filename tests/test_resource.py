@@ -253,8 +253,11 @@ def test_deserialize_raises_validation_errors(serialization_app: Starlette):
         'errors': [
             {
                 'detail': '`data` object must include `type` key.',
-                'source': {'pointer': '/data'}
-            }
+                'source': {'pointer': '/data'},
+            },
+            {
+                'detail': 'Bad Request',
+            },
         ]
     }
 

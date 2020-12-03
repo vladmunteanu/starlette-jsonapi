@@ -30,7 +30,17 @@ def test_serialize_error():
     assert isinstance(response, JSONAPIResponse)
     assert response.status_code == 400
     assert json.loads(response.body) == {
-        'errors': [{'detail': 'foo'}, {'detail': 'bar'}]
+        'errors': [{'detail': 'foo'}, {'detail': 'bar'}, {'detail': 'Bad Request'}]
+    }
+
+    error1 = JSONAPIException(404, 'error1')
+    error2 = JSONAPIException(400, 'error2')
+    final_error = JSONAPIException(400, 'final', errors=error1.errors + error2.errors)
+    response = serialize_error(final_error)
+    assert isinstance(response, JSONAPIResponse)
+    assert response.status_code == 400
+    assert json.loads(response.body) == {
+        'errors': [{'detail': 'error1'}, {'detail': 'error2'}, {'detail': 'final'}]
     }
 
 
