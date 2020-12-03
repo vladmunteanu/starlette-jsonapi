@@ -23,9 +23,6 @@ setup(
     packages=['starlette_jsonapi'],
     package_data={'starlette_jsonapi': ['LICENSE', 'README.md']},
     package_dir={'starlette_jsonapi': 'starlette_jsonapi'},
-    install_requires=[
-        'starlette>=0.14.0',
-    ],
     include_package_data=True,
     license='MIT License',
     url='https://github.com/vladmunteanu/starlette-jsonapi',

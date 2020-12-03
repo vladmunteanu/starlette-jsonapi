@@ -734,7 +734,7 @@ class BaseRelationshipResource:
 
 def _partial(*args, **kwargs):
     """
-    This is a temporary partial, since we cannot use functools......partial with Starlette due to asyncio bugs.
+    This is a temporary partial, since we cannot use functools.partial with Starlette due to asyncio bugs.
     https://github.com/encode/starlette/pull/984
     https://github.com/encode/starlette/pull/1106
     """
