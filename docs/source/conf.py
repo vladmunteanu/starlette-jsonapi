@@ -66,3 +66,5 @@ autodoc_default_options = {
     'member-order': 'bysource',
     'special-members': '__init__',
 }
+
+autodoc_inherit_docstrings = False

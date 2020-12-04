@@ -52,11 +52,12 @@ class JSONAPISchema(__Schema):
         has the following options to resolve the URLs from Starlette route names:
 
         * ``self_route`` - Route name to resolve the self URL link from.
-        * ``self_route_kwargs`` - Replacement fields for ``self_route``. String
-          attributes enclosed in ``< >`` will be interpreted as attributes to
+        * ``self_route_kwargs`` - Replacement fields for ``self_route``.
+                                  String attributes enclosed in ``< >`` will be
+                                  interpreted as attributes of the serialized object.
           pull from the schema data.
         * ``self_route_many`` - Route name to resolve the self URL link when a
-          collection of resources is returned.
+                                collection of resources is returned.
         """
         pass
 
