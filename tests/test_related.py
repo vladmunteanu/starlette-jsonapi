@@ -24,7 +24,6 @@ def relationship_app(app: Starlette):
         rel = JSONAPIRelationship(
             schema='TRelatedSchema',
             type_='test-related-resource',
-            include_resource_linkage=True,
         )
 
         class Meta:
@@ -162,7 +161,6 @@ def relationship_many_app(app: Starlette):
         rel_many = JSONAPIRelationship(
             schema='TRelatedSchema',
             type_='test-related-resource',
-            include_resource_linkage=True,
             many=True
         )
 
@@ -564,7 +562,6 @@ def relationship_links_app(app: Starlette):
             related_resource='TRelatedResource',
             related_route='test-resource:rel',
             related_route_kwargs={'id': '<id>'},
-            include_resource_linkage=True,
         )
 
         class Meta:
@@ -741,7 +738,6 @@ def test_relationship_resource_top_level_meta(app: Starlette):
         rel = JSONAPIRelationship(
             schema='TRelatedSchema',
             type_='test-related-resource',
-            include_resource_linkage=True,
         )
 
         class Meta:

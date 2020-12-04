@@ -65,7 +65,6 @@ class JSONAPIRelationship(__BaseRelationship):
                 author = JSONAPIRelationship(
                     type_='authors',
                     schema='AuthorSchema',
-                    include_resource_linkage=True,
                     id_attribute='author_id',
                 )
 
@@ -104,7 +103,8 @@ class JSONAPIRelationship(__BaseRelationship):
         self.self_route_kwargs = self_route_kwargs or {}
         # When doing a PATCH on a relationship, `data` is allowed to be None
         # if the client wishes to empty a relation.
-        kwargs.update(allow_none=kwargs.get('allow_none', True))
+        kwargs.setdefault('allow_none', True)
+        kwargs.setdefault('include_resource_linkage', True)
         super().__init__(**kwargs)
 
     # We override serialize because we want to allow asynchronous ORMs to do serialization

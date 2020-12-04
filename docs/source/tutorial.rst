@@ -57,14 +57,12 @@ Let's take Article as an example:
         author = JSONAPIRelationship(
            type_='authors',
            schema='AuthorSchema',
-           include_resource_linkage=True,  # renders the relationship data
            required=True,
         )
 
         comments = JSONAPIRelationship(
             type_='comments',
             schema='CommentSchema',
-            include_resource_linkage=True,
             many=True,
         )
 

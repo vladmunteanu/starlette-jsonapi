@@ -23,7 +23,6 @@ class UserSchema(JSONAPISchema):
     organization = JSONAPIRelationship(
         type_='organizations',
         schema='OrganizationSchema',
-        include_resource_linkage=True,
         required=True,
         related_resource='OrganizationsResource',
         related_route='users:organization',

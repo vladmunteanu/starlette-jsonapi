@@ -285,7 +285,6 @@ def included_app(app: Starlette):
         rel = JSONAPIRelationship(
             schema='TRelatedSchema',
             type_='test-related-resource',
-            include_resource_linkage=True,
         )
 
         class Meta:

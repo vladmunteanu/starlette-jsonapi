@@ -23,7 +23,6 @@ class TeamSchema(JSONAPISchema):
     users = JSONAPIRelationship(
         type_='users',
         schema='UserSchema',
-        include_resource_linkage=True,
         many=True,
         required=True,
         self_route='teams:relationships-users',
