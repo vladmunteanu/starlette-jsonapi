@@ -15,8 +15,7 @@ from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
 from starlette_jsonapi.pagination import BasePagination, Pagination
 from starlette_jsonapi.utils import (
-    parse_included_params, parse_sparse_fields_params, filter_sparse_fields,
-    serialize_error,
+    parse_included_params, serialize_error, process_sparse_fields, parse_sparse_fields_params,
 )
 
 logger = logging.getLogger(__name__)
@@ -147,6 +146,21 @@ class _BaseResourceHandler:
                 response = await cls.handle_error(request, request_context, exc=after_request_exc)
 
         return response
+
+    def process_sparse_fields_request(self, serialized_data: dict, many: bool = False) -> dict:
+        """
+        Processes sparse fields requests by calling
+        :func:`starlette_jsonapi.utils.process_sparse_fields`.
+
+        Can be overridden in subclasses if custom behavior is needed.
+
+        :param serialized_data: The complete json:api dict representation.
+        :param many: Whether ``serialized_data`` should be treated as a collection.
+        """
+        return process_sparse_fields(
+            serialized_data, many=many,
+            sparse_fields=parse_sparse_fields_params(self.request),
+        )
 
 
 class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
@@ -354,7 +368,7 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
         included_relations = await self._prepare_included(data=data, many=many)
         schema = self.schema(app=self.request.app, include_data=included_relations, *args, **kwargs)
         body = schema.dump(data, many=many)
-        sparse_body = await self.process_sparse_fields(body, many=many)
+        sparse_body = self.process_sparse_fields_request(body, many=many)
 
         if links:
             sparse_body['links'] = links
@@ -391,7 +405,7 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
             *args, **kwargs,
         )  # type: JSONAPISchema
         body = related_schema.dump(data, many=many)
-        sparse_body = await self.process_sparse_fields(body, many=many)
+        sparse_body = self.process_sparse_fields_request(body, many=many)
         return sparse_body
 
     async def paginate_request(self, object_list: Sequence, pagination_kwargs: dict = None) -> Pagination:
@@ -512,52 +526,6 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
             except _StopInclude:
                 return None
         return include_param_list
-
-    async def process_sparse_fields(self, serialized_data: dict, many: bool = False) -> dict:
-        """
-        Processes sparse fields requests by removing extra attributes
-        and relationships from the serialized data.
-
-        `<https://jsonapi.org/format/#fetching-sparse-fieldsets>`_
-        """
-        sparse_fields = parse_sparse_fields_params(self.request)
-        if not sparse_fields or not serialized_data.get('data'):
-            return serialized_data
-
-        data = serialized_data['data']
-        new_data = [] if many else {}  # type: Union[List, dict]
-
-        included = serialized_data.get('included', None)
-        new_included = []
-
-        # process sparse-fields for `data`
-        if many:
-            new_data = []
-            for item in data:
-                if item['type'] in sparse_fields:
-                    new_data.append(filter_sparse_fields(item, sparse_fields[item['type']]))
-                else:
-                    new_data.append(item)
-        else:
-            if data['type'] in sparse_fields:
-                new_data = filter_sparse_fields(data, sparse_fields[data['type']])
-            else:
-                new_data = data
-
-        # process sparse-fields for `included`
-        if included:
-            for item in included:
-                if item['type'] in sparse_fields:
-                    new_included.append(filter_sparse_fields(item, sparse_fields[item['type']]))
-                else:
-                    new_included.append(item)
-
-        new_serialized_data = serialized_data.copy()
-        new_serialized_data['data'] = new_data
-        if new_included:
-            new_serialized_data['included'] = new_included
-
-        return new_serialized_data
 
 
 class _StopInclude(Exception):

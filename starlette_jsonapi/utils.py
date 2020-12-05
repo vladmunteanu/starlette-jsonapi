@@ -1,4 +1,4 @@
-from typing import Optional, Set, Dict, List
+from typing import Optional, Set, Dict, List, Union
 
 from starlette.applications import Starlette
 from starlette.exceptions import HTTPException
@@ -119,6 +119,56 @@ def filter_sparse_fields(item: dict, sparse_fields: List[str]) -> dict:
         else:
             del new_item['relationships']
     return new_item
+
+
+def process_sparse_fields(serialized_data: dict, many: bool = False, sparse_fields: dict = None) -> dict:
+    """
+    Processes sparse fields requests by removing extra attributes
+    and relationships from the final serialized data.
+
+    If a client does not specify the set of fields for a given resource type,
+    all fields will be included.
+
+    Consult the `json:api spec <https://jsonapi.org/format/#fetching-sparse-fieldsets>`_
+    for more information.
+    """
+    if not sparse_fields or not serialized_data.get('data'):
+        return serialized_data
+
+    data = serialized_data['data']
+    new_data = [] if many else {}  # type: Union[List, dict]
+
+    included = serialized_data.get('included', None)
+    new_included = []
+
+    # process sparse-fields for `data`
+    if many:
+        new_data = []
+        for item in data:
+            if item['type'] in sparse_fields:
+                new_data.append(filter_sparse_fields(item, sparse_fields[item['type']]))
+            else:
+                new_data.append(item)
+    else:
+        if data['type'] in sparse_fields:
+            new_data = filter_sparse_fields(data, sparse_fields[data['type']])
+        else:
+            new_data = data
+
+    # process sparse-fields for `included`
+    if included:
+        for item in included:
+            if item['type'] in sparse_fields:
+                new_included.append(filter_sparse_fields(item, sparse_fields[item['type']]))
+            else:
+                new_included.append(item)
+
+    new_serialized_data = serialized_data.copy()
+    new_serialized_data['data'] = new_data
+    if new_included:
+        new_serialized_data['included'] = new_included
+
+    return new_serialized_data
 
 
 def prefix_url_path(app: Starlette, path: str, **kwargs):
