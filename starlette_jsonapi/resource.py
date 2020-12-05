@@ -458,7 +458,7 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
                 _partial(
                     'get_related',
                     relationship=rel_name,
-                    extract_params=['id', 'related_id'],
+                    extract_params=['id'],
                     request_context={'relationship': rel_name},
                 )(cls.handle_request),
                 methods=['GET'],
