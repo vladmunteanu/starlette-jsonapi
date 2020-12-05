@@ -735,6 +735,90 @@ def test_sparse_fields_many(included_app: Starlette):
     }
 
 
+def test_sparse_fields_includes_missing_types(included_app: Starlette):
+    test_client = TestClient(included_app)
+    rv = test_client.get(
+        '/test-resource/'
+        '?include=rel'
+        '&fields[test-related-resource]=nothing'
+    )
+    assert rv.status_code == 200
+    assert rv.json() == {
+        'data': [
+            {
+                'id': 'foo',
+                'type': 'test-resource',
+                'attributes': {
+                    'name': 'foo-name',
+                },
+                'relationships': {
+                    'rel': {
+                        'data': {
+                            'type': 'test-related-resource',
+                            'id': 'bar',
+                        }
+                    }
+                }
+            },
+            {
+                'id': 'foo2',
+                'type': 'test-resource',
+                'attributes': {
+                    'name': 'foo2-name',
+                },
+                'relationships': {
+                    'rel': {
+                        'data': {
+                            'type': 'test-related-resource',
+                            'id': 'bar2',
+                        }
+                    }
+                }
+            },
+        ],
+        'included': [
+            {
+                'id': 'bar',
+                'type': 'test-related-resource',
+            },
+            {
+                'id': 'bar2',
+                'type': 'test-related-resource',
+            }
+        ]
+    }
+
+    rv = test_client.get(
+        '/test-resource/foo'
+        '?include=rel'
+        '&fields[test-related-resource]=nothing'
+    )
+    assert rv.status_code == 200
+    assert rv.json() == {
+        'data': {
+            'id': 'foo',
+            'type': 'test-resource',
+            'attributes': {
+                'name': 'foo-name',
+            },
+            'relationships': {
+                'rel': {
+                    'data': {
+                        'type': 'test-related-resource',
+                        'id': 'bar',
+                    }
+                }
+            }
+        },
+        'included': [
+            {
+                'id': 'bar',
+                'type': 'test-related-resource',
+            }
+        ]
+    }
+
+
 def test_client_generated_ids(app: Starlette):
     class TSchema(JSONAPISchema):
         id = fields.Str()

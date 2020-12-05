@@ -33,13 +33,6 @@ class _BaseResourceHandler:
     #: not listed here will result in a 405 error.
     allowed_methods = {'GET', 'PATCH', 'POST', 'DELETE'}
 
-    #: Instance attribute representing the current HTTP request.
-    request: Request
-
-    #: Instance attribute representing the context of the current HTTP request.
-    #: Can be used to store additional information for the duration of a request.
-    request_context: dict
-
     def __init__(self, request: Request, request_context: dict, *args, **kwargs) -> None:
         """
         A Resource instance is created for each HTTP request,
@@ -47,7 +40,10 @@ class _BaseResourceHandler:
         is passed, as well as the context, which can be used to store information
         without altering the request object.
         """
+        #: Instance attribute representing the current HTTP request.
         self.request: Request = request
+        #: Instance attribute representing the context of the current HTTP request.
+        #: Can be used to store additional information for the duration of a request.
         self.request_context: dict = request_context
 
     @classmethod
@@ -67,7 +63,8 @@ class _BaseResourceHandler:
     async def after_request(cls, request: Request, request_context: dict, response: Response) -> None:
         """
         Optional hook that can be implemented by subclasses to execute logic after a request is handled.
-        This will not run if an exception is raised before :meth:`handle_request` is called.
+        This will not run if an exception is raised before :meth:`handle_request` is called, or if
+        :meth:`before_request` throws an error.
 
         For more advanced hooks, check starlette middleware.
 
@@ -533,28 +530,34 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
         included = serialized_data.get('included', None)
         new_included = []
 
-        for resource_name, fields in sparse_fields.items():
-            # filter sparse fields in `data`
-            if many:
-                for item in data:
-                    if item['type'] == resource_name:
-                        new_data.append(filter_sparse_fields(item, fields))  # type: ignore
+        # process sparse-fields for `data`
+        if many:
+            new_data = []
+            for item in data:
+                if item['type'] in sparse_fields:
+                    new_data.append(filter_sparse_fields(item, sparse_fields[item['type']]))
+                else:
+                    new_data.append(item)
+        else:
+            if data['type'] in sparse_fields:
+                new_data = filter_sparse_fields(data, sparse_fields[data['type']])
             else:
-                if data['type'] == resource_name:
-                    new_data = filter_sparse_fields(data, fields)
+                new_data = data
 
-            # filter sparse fields in `included`
-            if included:
-                for item in included:
-                    if item['type'] == resource_name:
-                        new_included.append(filter_sparse_fields(item, fields))
+        # process sparse-fields for `included`
+        if included:
+            for item in included:
+                if item['type'] in sparse_fields:
+                    new_included.append(filter_sparse_fields(item, sparse_fields[item['type']]))
+                else:
+                    new_included.append(item)
 
         new_serialized_data = serialized_data.copy()
         new_serialized_data['data'] = new_data
         if new_included:
             new_serialized_data['included'] = new_included
 
-        return serialized_data
+        return new_serialized_data
 
 
 class _StopInclude(Exception):

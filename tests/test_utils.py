@@ -5,7 +5,7 @@ from starlette.testclient import TestClient
 
 from starlette_jsonapi.exceptions import JSONAPIException
 from starlette_jsonapi.responses import JSONAPIResponse
-from starlette_jsonapi.utils import serialize_error, register_jsonapi_exception_handlers
+from starlette_jsonapi.utils import serialize_error, register_jsonapi_exception_handlers, filter_sparse_fields
 
 
 def test_serialize_error():
@@ -57,3 +57,34 @@ def test_uncaught_exceptions(app):
             }
         ]
     }
+
+
+def test_filter_sparse_fields_removes_fields():
+    jsonapi_repr = {
+        'id': '123',
+        'type': 'users',
+        'attributes': {
+            'name': 'User 1',
+            'country': 'US',
+        },
+        'relationships': {
+            'organization': {
+                'data': {
+                    'type': 'organizations',
+                    'id': '456',
+                }
+            }
+        }
+    }
+
+    assert filter_sparse_fields(jsonapi_repr, ['name']) == {
+        'id': '123',
+        'type': 'users',
+        'attributes': {
+            'name': 'User 1',
+        }
+    }
+
+    # check that the original data has not been mutated
+    assert 'country' in jsonapi_repr['attributes']
+    assert 'relationships' in jsonapi_repr
