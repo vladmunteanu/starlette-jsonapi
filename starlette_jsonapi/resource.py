@@ -99,8 +99,7 @@ class _BaseResourceHandler:
         If ``meta`` is specified, it will be included as the top level ``"meta"`` object in the json:api response.
         Additional args and kwargs are passed when instantiating a new :class:`JSONAPIResponse`.
 
-        :param data: Serialized resources / errors, as returned by
-                     :meth:`serialize`, :meth:`serialize_related` or :func:`starlette_jsonapi.utils.serialize_error`
+        :param data: Serialized resources / errors, as returned by :meth:`serialize` or :meth:`serialize_related`.
         :param meta: Optional dictionary with meta information. Overwrites any existing top level `meta` in ``data``.
         """
         if meta:
@@ -347,7 +346,7 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
         Additional args and kwargs are passed when initializing a new :attr:`schema`.
 
         :param data: an object, or a sequence of objects to be serialized
-        :param many: whether multiple objects were passed
+        :param many: whether ``data`` should be serialized as a collection
         :param paginate: whether to apply pagination to the given ``data``
         :param pagination_kwargs: additional parameters which are passed to :meth:`paginate_request`.
         """
@@ -375,7 +374,7 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
         Additional args and kwargs are passed when initializing a new :attr:`schema`.
 
         :param data: an object, or a sequence of objects to be serialized
-        :param many: whether multiple objects were passed
+        :param many: whether ``data`` should be serialized as a collection
         """
         relationship = self.request_context['relationship']
         parent_id = self.request_context['id']

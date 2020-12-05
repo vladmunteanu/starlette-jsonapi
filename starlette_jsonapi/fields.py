@@ -29,7 +29,11 @@ class JSONAPIRelationship(__BaseRelationship):
         """
         Serializes a related object, according to the json:api standard.
 
+        Example definition:
+
         .. code-block:: python
+            :linenos:
+            :emphasize-lines: 32,33,34,35,36
 
             from starlette_jsonapi.schema import JSONAPISchema
 

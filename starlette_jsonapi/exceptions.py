@@ -12,7 +12,7 @@ class JSONAPIException(HTTPException):
 
         :param status_code: HTTP status code
         :param detail: Optional, error detail, will be serialized in the final HTTP response.
-                       DO NOT include sensitive information here.
+                       **DO NOT** include sensitive information here.
                        If not specified, the HTTP message associated to ``status_code``
                        will be used.
         :param errors: Optional, list of json:api error representations.
