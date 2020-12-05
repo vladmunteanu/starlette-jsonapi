@@ -88,3 +88,31 @@ def test_filter_sparse_fields_removes_fields():
     # check that the original data has not been mutated
     assert 'country' in jsonapi_repr['attributes']
     assert 'relationships' in jsonapi_repr
+
+
+def test_filter_sparse_fields_unknown_field():
+    jsonapi_repr = {
+        'id': '123',
+        'type': 'users',
+        'attributes': {
+            'name': 'User 1',
+            'country': 'US',
+        },
+        'relationships': {
+            'organization': {
+                'data': {
+                    'type': 'organizations',
+                    'id': '456',
+                }
+            }
+        }
+    }
+
+    assert filter_sparse_fields(jsonapi_repr, ['unknown']) == {
+        'id': '123',
+        'type': 'users',
+    }
+
+    # check that the original data has not been mutated
+    assert 'attributes' in jsonapi_repr
+    assert 'relationships' in jsonapi_repr
