@@ -93,7 +93,7 @@ class JSONAPIRelationship(__BaseRelationship):
         :param self_route: Same as :attr:`related_route`, but refers to the relationship
                            resource GET handler. Renders as `self` inside the `links` object.
                            For example, ``ArticleSchema.author`` would specify
-                           ``self_route='articles:relationship-author'``, which would render as
+                           ``self_route='articles:relationships-author'``, which would render as
                            `/articles/<parent_id>/relationships/author`.
         :param self_route_kwargs: Additional :attr:`self_route` kwargs that should be
                                   passed when calling ``app.url_path_for`` to build path params.

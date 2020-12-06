@@ -133,7 +133,7 @@ class _BaseResourceHandler:
             try:
                 if request.method not in cls.allowed_methods:
                     raise JSONAPIException(status_code=405)
-                resource = cls(request, request_context)
+                resource = cls(request, request_context, *args, **kwargs)
                 handler = getattr(resource, handler_name, None)
                 response = await handler(*args, **kwargs)
             except Exception as e:
@@ -422,9 +422,29 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
         return pagination
 
     @classmethod
-    def register_routes(cls, app: Starlette, base_path: str):
+    def register_routes(cls, app: Starlette, base_path: str = ''):
         """
-        Registers URL routes associated to this resource.
+        Registers URL routes associated to this resource, using a :class:`starlette.routing.Mount`.
+        The mount name will be set based on :attr:`type_`, or :attr:`register_as`, if defined.
+        All routes will then be registered under this mount.
+
+        If the configured :attr:`schema` defines relationships, then routes for related objects
+        will also be registered.
+
+        Let's take the articles resource as an example:.
+
+        .. csv-table:: Registered Routes
+            :header: "Name", "URL", "HTTP method", "Description"
+
+            "articles:get_many", "/articles/", "GET", "Retrieve articles"
+            "articles:post", "/articles/", "POST", "Create an article"
+            "articles:get", "/articles/<id>", "GET", "Retrieve an article by ID"
+            "articles:patch", "/articles/<id>", "PATCH", "Update an article by ID"
+            "articles:delete", "/articles/<id>", "DELETE", "Delete an article by ID"
+            "articles:author", "/articles/<id>/author", "GET", "Retrieve an article's author"
+            "articles:comments", "/articles/<id>/comments", "GET", "Retrieve an article's comments"
+            "articles:comments-id", "/articles/<id>/comments/<related_id>", "GET", "Retrieve an article comment by ID"
+
         """
         if not cls.type_ or not cls.schema:
             raise Exception('Cannot register a resource without specifying its `type_` and its `schema`.')
@@ -611,6 +631,19 @@ class BaseRelationshipResource(_BaseResourceHandler):
         """
         Registers URL routes associated to this resource.
         Should be called after calling register_routes for the parent resource.
+
+        The following URL routes will be registered, relative to :attr:`parent_resource`:
+
+            - **Relative name:** ``relationships-<relationship_name>``
+            - **Relative URL:** ``/<parent_id>/relationships/<relationship_name>``
+
+        For example, a relationship resource that would handle article authors
+        would be registered relative to the articles resource as:
+
+            - **Relative name:** ``relationships-author``
+            - **Full name:** ``articles:relationships-author``
+            - **Relative URL:** ``/<parent_id>/relationships/author``
+            - **Full URL:** ``/articles/<parent_id>/relationships/author``
         """
         if not cls.parent_resource.type_:
             raise Exception(
