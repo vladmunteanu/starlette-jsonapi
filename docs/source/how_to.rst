@@ -77,7 +77,7 @@ mentions:
 If you intend to use ``uuid`` IDs, set ``id_mask = 'uuid'`` when defining the Resource class, and some validation
 will be handled by Starlette.
 
-Requests with malformed IDS will likely result in 404 errors.
+Requests with malformed IDs will likely result in 404 errors.
 
 Top level meta objects
 ----------------------

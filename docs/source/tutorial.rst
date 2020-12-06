@@ -14,7 +14,7 @@ We are not going to bother with an actual ORM right now, so let's start by defin
         title: str
         content: str
         author: Author
-        comments: Optional[List[Comment]]  # this would be populated dynamically by an ORM
+        comments: Optional[List['Comment']]  # this would be populated dynamically by an ORM
 
     class Comment:
         id: int
@@ -109,17 +109,17 @@ by subclassing :class:`starlette_jsonapi.resource.BaseResource`.
         # More options available, consult the `starlette` routing documentation.
         id_mask = 'int'
 
-        async def get(self, id=None, *args, **kwargs) -> Response:
+        async def get(self, id: int, *args, **kwargs) -> Response:
             """ Will handle GET /articles/<id> """
             article = get_article_by_id(id)  # type: Article
             serialized_article = await self.serialize(data=article)
             return await self.to_response(serialized_article)
 
-        async def patch(self, id=None, *args, **kwargs) -> Response:
+        async def patch(self, id: int, *args, **kwargs) -> Response:
             """ Will handle PATCH /articles/<id> """
             ...
 
-        async def delete(self, id=None, *args, **kwargs) -> Response:
+        async def delete(self, id: int, *args, **kwargs) -> Response:
             """ Will handle DELETE /articles/<id> """
             ...
 
@@ -145,7 +145,7 @@ the above resource in the Starlette routing mechanism.
 
     app = Starlette()
 
-    ArticlesResource.register_routes(app=app, base_path='/')
+    ArticlesResource.register_routes(app=app, base_path='/api/')
 
 This will register the following routes:
 
@@ -230,11 +230,11 @@ we can implement the :meth:`starlette_jsonapi.resource.BaseResource.get_related`
 5. Compound documents
 ---------------------
 That takes care of related resources, but what about compound documents through ``?include=`` requests?
-`starlette-jsonapi` helps you with that through the :meth:`starlette_jsonapi.resource.BaseResource.prepare_relations` handler.
+`starlette-jsonapi` helps you with that through :meth:`starlette_jsonapi.resource.BaseResource.prepare_relations`.
 For our example, we just need to override the default implementation of ``prepare_relations`` to allow include requests.
-That's because the relationship is on the object since we're using plain objects.
-However, async ORMs generally can't implement lazy evaluation,
-so this method is available to fetch the related resources and make them available to the serialization process.
+That's because the related objects are already populated on the object in this example.
+However, async ORMs generally can't implement lazy evaluation, so this method should be implemented to fetch the
+related resources and make them available to the serialization process.
 
 .. code-block:: python
 
@@ -245,8 +245,9 @@ so this method is available to fetch the related resources and make them availab
 
         async def prepare_relations(self, obj: Article, relations: List[str]):
             """
-            For our tutorial's Article implementation, we don't need to do anything.
-            We override the BaseResource implementation to mark support for compound documents.
+            For our tutorial's Article implementation, we don't need to fetch anything.
+            We override the base implementation to support compound documents,
+            since the default behavior ignores them.
             """
             return None
 
@@ -297,7 +298,7 @@ We can also render the link associated to the above relationship resource by pas
            # The self route is used to generate the relationship's `self` link.
            self_route='articles:relationships-author',
 
-           # The self route looks like this /articles/{id:int}/relationships/author
+           # The self route looks like this /articles/<parent_id>/relationships/author
            # so we need to indicate the URL path parameters.
            self_route_kwargs={'parent_id': '<id>'}
         )
@@ -310,7 +311,7 @@ Just as we did with primary resources, we need to register a relationship resour
 
     app = Starlette()
 
-    ArticlesResource.register_routes(app=app, base_path='/')
+    ArticlesResource.register_routes(app=app, base_path='/api/')
     ArticlesAuthorResource.register_routes(app=app)
 
 In the end, our app will have the following routes registered:
