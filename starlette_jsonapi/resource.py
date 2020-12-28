@@ -289,8 +289,10 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
 
     async def prepare_relations(self, obj: Any, relations: List[str]) -> None:
         """
-        Subclasses should implement this to handle requests for compound documents.
+        Subclasses should implement this to support requests for compound documents.
         `<https://jsonapi.org/format/#document-compound-documents>`_
+
+        By default returns a 400 error, according to the json:api specification.
 
         Example request URL: ``GET /?include=relationship1,relationship1.child_relationship``
         Example relations: ``['relationship1', 'relationship1.child_relationship']``
@@ -298,7 +300,7 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
         :param obj: an object that was passed to :meth:`serialize`
         :param relations: list of relations described above
         """
-        raise _StopInclude
+        raise JSONAPIException(status_code=400)
 
     async def deserialize_body(self, partial=None) -> dict:
         """
@@ -536,15 +538,9 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
         include_param_list = list(include_param)
         if many is True:
             for item in data:
-                try:
-                    await self.prepare_relations(obj=item, relations=include_param_list)
-                except _StopInclude:
-                    return None
+                await self.prepare_relations(obj=item, relations=include_param_list)
         else:
-            try:
-                await self.prepare_relations(obj=data, relations=include_param_list)
-            except _StopInclude:
-                return None
+            await self.prepare_relations(obj=data, relations=include_param_list)
         return include_param_list
 
 

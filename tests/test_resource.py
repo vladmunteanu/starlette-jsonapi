@@ -428,46 +428,26 @@ def test_included_data_many(included_app: Starlette):
 
 def test_no_included_data(included_app: Starlette):
     # if resource does not override `prepare_relations`,
-    # compound documents will not be generated
+    # a 400 error should be returned.
     test_client = TestClient(app=included_app)
     rv = test_client.get('/test-resource-not-included/foo?include=rel')
-    assert rv.status_code == 200
+    assert rv.status_code == 400
     assert rv.json() == {
-        'data': {
-            'id': 'foo',
-            'type': 'test-resource',
-            'attributes': {
-                'name': 'foo-name',
-            },
-            'relationships': {
-                'rel': {
-                    'data': {
-                        'type': 'test-related-resource',
-                        'id': 'bar',
-                    }
-                }
+        'errors': [
+            {
+                'detail': 'Bad Request',
             }
-        }
+        ]
     }
 
     rv = test_client.get('/test-resource-not-included/?include=rel')
-    assert rv.status_code == 200
+    assert rv.status_code == 400
     assert rv.json() == {
-        'data': [{
-            'id': 'foo2',
-            'type': 'test-resource',
-            'attributes': {
-                'name': 'foo2-name',
-            },
-            'relationships': {
-                'rel': {
-                    'data': {
-                        'type': 'test-related-resource',
-                        'id': 'bar2',
-                    }
-                }
+        'errors': [
+            {
+                'detail': 'Bad Request',
             }
-        }]
+        ]
     }
 
 

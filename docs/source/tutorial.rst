@@ -229,12 +229,14 @@ we can implement the :meth:`starlette_jsonapi.resource.BaseResource.get_related`
 
 5. Compound documents
 ---------------------
-That takes care of related resources, but what about compound documents through ``?include=`` requests?
-`starlette-jsonapi` helps you with that through :meth:`starlette_jsonapi.resource.BaseResource.prepare_relations`.
+The previous chapter takes care of related resources, but what about compound documents through ``?include=`` requests?
+`starlette-jsonapi` offers :meth:`starlette_jsonapi.resource.BaseResource.prepare_relations`, which subclasses can override to support compound document requests.
+The default implementation will return a 400 Bad Request error, per json:api specifications.
+
 For our example, we just need to override the default implementation of ``prepare_relations`` to allow include requests.
-That's because the related objects are already populated on the object in this example.
+That's because the related objects are already populated on the resource in this example, so no additional database operations are required.
 However, async ORMs generally can't implement lazy evaluation, so this method should be implemented to fetch the
-related resources and make them available to the serialization process.
+related resources and make them available during serialization.
 
 .. code-block:: python
 
@@ -246,8 +248,7 @@ related resources and make them available to the serialization process.
         async def prepare_relations(self, obj: Article, relations: List[str]):
             """
             For our tutorial's Article implementation, we don't need to fetch anything.
-            We override the base implementation to support compound documents,
-            since the default behavior ignores them.
+            We override the base implementation to support compound documents.
             """
             return None
 
