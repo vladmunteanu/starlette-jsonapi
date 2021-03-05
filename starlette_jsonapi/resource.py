@@ -1,5 +1,5 @@
+import functools
 import logging
-from functools import wraps
 from typing import Type, Any, List, Optional, Union, Sequence, Dict
 
 from marshmallow.exceptions import ValidationError
@@ -462,12 +462,13 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
         routes = [
             Route(
                 '/{{id:{}}}/{}/{{related_id:{}}}'.format(cls.id_mask, rel_name, rel_class.id_mask),
-                _partial(
+                functools.partial(
+                    cls.handle_request,
                     'get_related',
                     relationship=rel_name,
                     extract_params=['id', 'related_id'],
                     request_context={'relationship': rel_name},
-                )(cls.handle_request),
+                ),
                 methods=['GET'],
                 name=f'{rel_name}-id',
             )
@@ -477,12 +478,13 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
         routes += [
             Route(
                 '/{{id:{}}}/{}'.format(cls.id_mask, rel_name),
-                _partial(
+                functools.partial(
+                    cls.handle_request,
                     'get_related',
                     relationship=rel_name,
                     extract_params=['id'],
                     request_context={'relationship': rel_name},
-                )(cls.handle_request),
+                ),
                 methods=['GET'],
                 name=rel_name,
             )
@@ -493,27 +495,27 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
         routes += [
             Route(
                 '/{{id:{}}}'.format(cls.id_mask),
-                _partial('get', extract_params=['id'])(cls.handle_request),
+                functools.partial(cls.handle_request, 'get', extract_params=['id']),
                 methods=['GET'], name='get',
             ),
             Route(
                 '/{{id:{}}}'.format(cls.id_mask),
-                _partial('patch', extract_params=['id'])(cls.handle_request),
+                functools.partial(cls.handle_request, 'patch', extract_params=['id']),
                 methods=['PATCH'], name='patch',
             ),
             Route(
                 '/{{id:{}}}'.format(cls.id_mask),
-                _partial('delete', extract_params=['id'])(cls.handle_request),
+                functools.partial(cls.handle_request, 'delete', extract_params=['id']),
                 methods=['DELETE'], name='delete',
             ),
             Route(
                 '/',
-                _partial('get_many')(cls.handle_request),
+                functools.partial(cls.handle_request, 'get_many'),
                 methods=['GET'], name='get_many',
             ),
             Route(
                 '/',
-                _partial('post')(cls.handle_request),
+                functools.partial(cls.handle_request, 'post'),
                 methods=['POST'], name='post',
             ),
         ]
@@ -658,21 +660,7 @@ class BaseRelationshipResource(_BaseResourceHandler):
                         cls.parent_resource.id_mask,
                         cls.relationship_name
                     ),
-                    endpoint=_partial(method.lower(), extract_params=['parent_id'])(cls.handle_request),
+                    endpoint=functools.partial(cls.handle_request, method.lower(), extract_params=['parent_id']),
                     methods=[method],
                 )
             )
-
-
-def _partial(*args, **kwargs):
-    """
-    This is a temporary partial, since we cannot use functools.partial with Starlette due to asyncio bugs.
-    https://github.com/encode/starlette/pull/984
-    https://github.com/encode/starlette/pull/1106
-    """
-    def outer(f):
-        @wraps(f)
-        async def inner(request: Request):
-            return await f(request=request, *args, **kwargs)
-        return inner
-    return outer
