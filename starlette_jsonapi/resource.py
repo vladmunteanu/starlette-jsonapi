@@ -546,10 +546,6 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
         return include_param_list
 
 
-class _StopInclude(Exception):
-    pass
-
-
 class BaseRelationshipResource(_BaseResourceHandler):
     """ A basic json:api relationships resource implementation, data layer agnostic. """
 
