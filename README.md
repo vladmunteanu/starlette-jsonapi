@@ -59,4 +59,4 @@ As simple as running ```tox```.
 
 If you plan to use pyenv and want to run tox for multiple python versions,
 you can create multiple virtual environments and then make them available to tox by running
-something like: `pyenv global starlette_jsonapi_venv36 starlette_jsonapi_venv37 starlette_jsonapi_venv38`.
+something like: `pyenv shell starlette_jsonapi_venv36 starlette_jsonapi_venv37 starlette_jsonapi_venv38 starlette_jsonapi_venv39`.
