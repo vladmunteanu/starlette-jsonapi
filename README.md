@@ -11,7 +11,7 @@ any available async ORM. This also means that you are going to get a very basic 
 with some helpers to make your experience more pleasant, but nothing fancy.
 
 ##### Installing
-`pip install starlette-jsonapi==1.2.0`
+`pip install starlette-jsonapi`
 
 Since this project is under development, please pin your dependencies to avoid problems.
 
@@ -25,9 +25,9 @@ Since this project is under development, please pin your dependencies to avoid p
 - sparse fields
 - support for client generated IDs
 - support top level meta objects
+- [pagination helpers](https://jsonapi.org/format/#fetching-pagination)
 
 ### Todo:
-- [pagination helpers](https://jsonapi.org/format/#fetching-pagination)
 - [sorting helpers](https://jsonapi.org/format/#fetching-sorting)
 - examples for other ORMs
 - [support jsonapi objects](https://jsonapi.org/format/#document-jsonapi-object)
@@ -39,6 +39,18 @@ Available on [Read The Docs](https://starlette-jsonapi.readthedocs.io/)
 
 You should take a look at the [examples](examples) directory for full implementations.
 
+To generate documentation files locally, you should create a virtualenv,
+then activate it and install the requirements:
+```shell
+cd docs
+pip install -r requirements.txt
+```
+
+With the docs virtualenv activated, you can then run `make html` to generate the HTML files.
+
+The result will be written to `docs/build`, and you can open `docs/build/html/index.html` in your browser of choice
+to view the pages.
+
 ## Contributing
 This project is in its early days, so **any** help is appreciated.
 
@@ -47,4 +59,4 @@ As simple as running ```tox```.
 
 If you plan to use pyenv and want to run tox for multiple python versions,
 you can create multiple virtual environments and then make them available to tox by running
-something like: `pyenv shell starlette_jsonapi_venv36 starlette_jsonapi_venv37`.
+something like: `pyenv shell starlette_jsonapi_venv36 starlette_jsonapi_venv37 starlette_jsonapi_venv38 starlette_jsonapi_venv39`.

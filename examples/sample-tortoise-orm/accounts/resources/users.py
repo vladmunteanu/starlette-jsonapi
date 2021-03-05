@@ -23,7 +23,6 @@ class UserSchema(JSONAPISchema):
     organization = JSONAPIRelationship(
         type_='organizations',
         schema='OrganizationSchema',
-        include_resource_linkage=True,
         id_attribute='organization_id',
         required=True,
         related_route='users:organization',
@@ -36,7 +35,7 @@ class UserSchema(JSONAPISchema):
         strict = True
         self_route = 'users:get'
         self_route_kwargs = {'id': '<id>'}
-        self_route_many = 'users:get_all'
+        self_route_many = 'users:get_many'
 
 
 class UsersResource(BaseResource):
@@ -44,7 +43,7 @@ class UsersResource(BaseResource):
     schema = UserSchema
     id_mask = 'int'
 
-    async def prepare_relations(self, obj: User, relations: List[str]):
+    async def include_relations(self, obj: User, relations: List[str]):
         if 'organization' in relations:
             await obj.fetch_related('organization')
 
@@ -95,7 +94,7 @@ class UsersResource(BaseResource):
 
         return JSONResponse(status_code=204)
 
-    async def get_all(self, *args, **kwargs) -> Response:
+    async def get_many(self, *args, **kwargs) -> Response:
         users = await User.all()
         return await self.to_response(await self.serialize(data=users, many=True))
 

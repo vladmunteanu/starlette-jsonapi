@@ -23,7 +23,6 @@ class TeamSchema(JSONAPISchema):
     users = JSONAPIRelationship(
         type_='users',
         schema='UserSchema',
-        include_resource_linkage=True,
         many=True,
         required=True,
         self_route='teams:relationships-users',
@@ -37,7 +36,7 @@ class TeamSchema(JSONAPISchema):
         type_ = 'teams'
         self_route = 'teams:get'
         self_route_kwargs = {'id': '<id>'}
-        self_route_many = 'teams:get_all'
+        self_route_many = 'teams:get_many'
 
 
 class TeamsResource(BaseResource):
@@ -45,7 +44,7 @@ class TeamsResource(BaseResource):
     schema = TeamSchema
     id_mask = 'int'
 
-    async def prepare_relations(self, obj: Team, relations: List[str]):
+    async def include_relations(self, obj: Team, relations: List[str]):
         """
         We override this to allow `included` requests against this resource,
         but we don't actually have to do anything here.
@@ -99,7 +98,7 @@ class TeamsResource(BaseResource):
 
         return JSONAPIResponse(status_code=204)
 
-    async def get_all(self, *args, **kwargs) -> Response:
+    async def get_many(self, *args, **kwargs) -> Response:
         teams = Team.get_items()
         return await self.to_response(await self.serialize(data=teams, many=True))
 

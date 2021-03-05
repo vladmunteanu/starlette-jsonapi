@@ -25,7 +25,6 @@ class UserSchema(JSONAPISchema):
     organization = JSONAPIRelationship(
         type_='organizations',
         schema='OrganizationSchema',
-        include_resource_linkage=True,
         id_attribute='organization_id',
         required=True,
         related_route='users:organization',
@@ -38,7 +37,7 @@ class UserSchema(JSONAPISchema):
         strict = True
         self_route = 'users:get'
         self_route_kwargs = {'id': '<id>'}
-        self_route_many = 'users:get_all'
+        self_route_many = 'users:get_many'
 
 
 class UsersResource(BaseResourceSQLA):
@@ -50,7 +49,7 @@ class UsersResource(BaseResourceSQLA):
         super().__init__(*args, **kwargs)
         self.session = Session()
 
-    async def prepare_relations(self, obj: User, relations: List[str]):
+    async def include_relations(self, obj: User, relations: List[str]):
         """ We override this to allow include requests. """
         # sqlalchemy supports lazy loading of relationships,
         # so we don't need to load them manually,
@@ -106,7 +105,7 @@ class UsersResource(BaseResourceSQLA):
 
         return JSONAPIResponse(status_code=204)
 
-    async def get_all(self, *args, **kwargs) -> Response:
+    async def get_many(self, *args, **kwargs) -> Response:
         users = self.db_session.query(User).all()
         return await self.to_response(await self.serialize(data=users, many=True))
 

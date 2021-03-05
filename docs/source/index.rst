@@ -24,11 +24,11 @@ Features
 - sparse fields
 - support for client generated IDs
 - support top level meta objects
+- `pagination helpers <https://jsonapi.org/format/#fetching-pagination>`_
 
 Todo
 ----
 
-- `pagination helpers <https://jsonapi.org/format/#fetching-pagination>`_
 - `sorting helpers <https://jsonapi.org/format/#fetching-sorting>`_
 - `support jsonapi objects <https://jsonapi.org/format/#document-jsonapi-object>`_
 - `enforce member name validation <https://jsonapi.org/format/#document-member-names>`_

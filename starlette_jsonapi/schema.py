@@ -43,20 +43,51 @@ class BaseSchemaOpts(__SchemaOpts):
 
 
 class JSONAPISchema(__Schema):
+    """
+    Extends :class:`marshmallow_jsonapi.Schema` to offer Starlette support.
+
+    For extended information on what fields are required, or how to configure each field
+    in a schema, you should consult the docs for:
+
+        - `marshmallow_jsonapi <https://marshmallow-jsonapi.readthedocs.io/>`_
+        - `marshmallow <https://marshmallow.readthedocs.io/>`_
+
+    When specifying related objects, the :class:`starlette_jsonapi.fields.JSONAPIRelationship`
+    field should be used, to support generating URLs from Starlette routes.
+
+    Example definition:
+
+    .. code-block:: python
+
+        from marshmallow_jsonapi import fields
+
+        # example model
+        class User:
+            id: int
+            name: str
+
+        # example schema
+        class UserSchema(JSONAPISchema):
+            class Meta:
+                type_ = 'users'
+
+            id = fields.Str()  # Exposed as a string, according to the json:api spec
+            name = fields.Str()
+    """
     OPTIONS_CLASS = BaseSchemaOpts
 
     class Meta:
         """
-        Options object that takes the same options as `marshmallow-jsonapi.Schema`,
+        Options object that takes the same options as :class:`marshmallow-jsonapi.Schema`,
         but instead of ``self_url``, ``self_url_kwargs`` and ``self_url_many``
         has the following options to resolve the URLs from Starlette route names:
 
         * ``self_route`` - Route name to resolve the self URL link from.
-        * ``self_route_kwargs`` - Replacement fields for ``self_route``. String
-          attributes enclosed in ``< >`` will be interpreted as attributes to
-          pull from the schema data.
+        * ``self_route_kwargs`` - Replacement fields for ``self_route``.
+                                  String attributes enclosed in ``< >`` will be
+                                  interpreted as attributes of the serialized object.
         * ``self_route_many`` - Route name to resolve the self URL link when a
-          collection of resources is returned.
+                                collection of resources is returned.
         """
         pass
 

@@ -1,3 +1,4 @@
+import json
 import logging
 import uuid
 from asyncio import Future
@@ -35,21 +36,21 @@ def test_register_routes(app: Starlette):
     assert app.url_path_for('test-resource:get', id='foo') == '/some-base-path/test-resource/foo'
     assert app.url_path_for('test-resource:patch', id='foo') == '/some-base-path/test-resource/foo'
     assert app.url_path_for('test-resource:delete', id='foo') == '/some-base-path/test-resource/foo'
-    assert app.url_path_for('test-resource:get_all') == '/some-base-path/test-resource/'
+    assert app.url_path_for('test-resource:get_many') == '/some-base-path/test-resource/'
     assert app.url_path_for('test-resource:post') == '/some-base-path/test-resource/'
 
     # test routes for T2Resource
     assert app.url_path_for('test-resource-2:get', id='foo') == '/test-resource-2/foo'
     assert app.url_path_for('test-resource-2:patch', id='foo') == '/test-resource-2/foo'
     assert app.url_path_for('test-resource-2:delete', id='foo') == '/test-resource-2/foo'
-    assert app.url_path_for('test-resource-2:get_all') == '/test-resource-2/'
+    assert app.url_path_for('test-resource-2:get_many') == '/test-resource-2/'
     assert app.url_path_for('test-resource-2:post') == '/test-resource-2/'
 
     # test routes for T3Resource
     assert app.url_path_for('v2-test-resource-2:get', id='foo') == '/v2/test-resource-2/foo'
     assert app.url_path_for('v2-test-resource-2:patch', id='foo') == '/v2/test-resource-2/foo'
     assert app.url_path_for('v2-test-resource-2:delete', id='foo') == '/v2/test-resource-2/foo'
-    assert app.url_path_for('v2-test-resource-2:get_all') == '/v2/test-resource-2/'
+    assert app.url_path_for('v2-test-resource-2:get_many') == '/v2/test-resource-2/'
     assert app.url_path_for('v2-test-resource-2:post') == '/v2/test-resource-2/'
 
 
@@ -161,7 +162,7 @@ def serialization_app(app: Starlette):
         type_ = 'test-resource'
         schema = TSchema
 
-        async def get_all(self, *args, **kwargs) -> Response:
+        async def get_many(self, *args, **kwargs) -> Response:
             return await self.to_response(await self.serialize([dict(id=1, name='foo')], many=True))
 
         async def get(self, id=None, *args, **kwargs) -> Response:
@@ -252,8 +253,11 @@ def test_deserialize_raises_validation_errors(serialization_app: Starlette):
         'errors': [
             {
                 'detail': '`data` object must include `type` key.',
-                'source': {'pointer': '/data'}
-            }
+                'source': {'pointer': '/data'},
+            },
+            {
+                'detail': 'Bad Request',
+            },
         ]
     }
 
@@ -281,7 +285,6 @@ def included_app(app: Starlette):
         rel = JSONAPIRelationship(
             schema='TRelatedSchema',
             type_='test-related-resource',
-            include_resource_linkage=True,
         )
 
         class Meta:
@@ -298,7 +301,7 @@ def included_app(app: Starlette):
         type_ = 'test-resource'
         schema = TSchema
 
-        async def prepare_relations(self, obj: Any, relations: List[str]) -> None:
+        async def include_relations(self, obj: Any, relations: List[str]) -> None:
             return None
 
         async def get(self, id=None, *args, **kwargs) -> Response:
@@ -306,7 +309,7 @@ def included_app(app: Starlette):
                 dict(id='foo', name='foo-name', rel=dict(id='bar', description='bar-description'))
             ))
 
-        async def get_all(self, *args, **kwargs) -> Response:
+        async def get_many(self, *args, **kwargs) -> Response:
             return await self.to_response(await self.serialize(
                 [
                     dict(id='foo', name='foo-name', rel=dict(id='bar', description='bar-description')),
@@ -324,7 +327,7 @@ def included_app(app: Starlette):
                 dict(id='foo', name='foo-name', rel=dict(id='bar', description='bar-description'))
             ))
 
-        async def get_all(self, *args, **kwargs) -> Response:
+        async def get_many(self, *args, **kwargs) -> Response:
             return await self.to_response(await self.serialize(
                 [dict(id='foo2', name='foo2-name', rel=dict(id='bar2', description='bar2-description'))],
                 many=True
@@ -424,47 +427,27 @@ def test_included_data_many(included_app: Starlette):
 
 
 def test_no_included_data(included_app: Starlette):
-    # if resource does not override `prepare_relations`,
-    # compound documents will not be generated
+    # if resource does not override `include_relations`,
+    # a 400 error should be returned.
     test_client = TestClient(app=included_app)
     rv = test_client.get('/test-resource-not-included/foo?include=rel')
-    assert rv.status_code == 200
+    assert rv.status_code == 400
     assert rv.json() == {
-        'data': {
-            'id': 'foo',
-            'type': 'test-resource',
-            'attributes': {
-                'name': 'foo-name',
-            },
-            'relationships': {
-                'rel': {
-                    'data': {
-                        'type': 'test-related-resource',
-                        'id': 'bar',
-                    }
-                }
+        'errors': [
+            {
+                'detail': 'Bad Request',
             }
-        }
+        ]
     }
 
     rv = test_client.get('/test-resource-not-included/?include=rel')
-    assert rv.status_code == 200
+    assert rv.status_code == 400
     assert rv.json() == {
-        'data': [{
-            'id': 'foo2',
-            'type': 'test-resource',
-            'attributes': {
-                'name': 'foo2-name',
-            },
-            'relationships': {
-                'rel': {
-                    'data': {
-                        'type': 'test-related-resource',
-                        'id': 'bar2',
-                    }
-                }
+        'errors': [
+            {
+                'detail': 'Bad Request',
             }
-        }]
+        ]
     }
 
 
@@ -498,7 +481,7 @@ def test_method_not_allowed(app: Starlette):
         type_ = 'test-resource'
         allowed_methods = {'GET'}
 
-        async def get_all(self, *args, **kwargs) -> Response:
+        async def get_many(self, *args, **kwargs) -> Response:
             return Response(status_code=200)
 
         async def post(self, *args, **kwargs) -> Response:
@@ -732,6 +715,90 @@ def test_sparse_fields_many(included_app: Starlette):
     }
 
 
+def test_sparse_fields_includes_missing_types(included_app: Starlette):
+    test_client = TestClient(included_app)
+    rv = test_client.get(
+        '/test-resource/'
+        '?include=rel'
+        '&fields[test-related-resource]=nothing'
+    )
+    assert rv.status_code == 200
+    assert rv.json() == {
+        'data': [
+            {
+                'id': 'foo',
+                'type': 'test-resource',
+                'attributes': {
+                    'name': 'foo-name',
+                },
+                'relationships': {
+                    'rel': {
+                        'data': {
+                            'type': 'test-related-resource',
+                            'id': 'bar',
+                        }
+                    }
+                }
+            },
+            {
+                'id': 'foo2',
+                'type': 'test-resource',
+                'attributes': {
+                    'name': 'foo2-name',
+                },
+                'relationships': {
+                    'rel': {
+                        'data': {
+                            'type': 'test-related-resource',
+                            'id': 'bar2',
+                        }
+                    }
+                }
+            },
+        ],
+        'included': [
+            {
+                'id': 'bar',
+                'type': 'test-related-resource',
+            },
+            {
+                'id': 'bar2',
+                'type': 'test-related-resource',
+            }
+        ]
+    }
+
+    rv = test_client.get(
+        '/test-resource/foo'
+        '?include=rel'
+        '&fields[test-related-resource]=nothing'
+    )
+    assert rv.status_code == 200
+    assert rv.json() == {
+        'data': {
+            'id': 'foo',
+            'type': 'test-resource',
+            'attributes': {
+                'name': 'foo-name',
+            },
+            'relationships': {
+                'rel': {
+                    'data': {
+                        'type': 'test-related-resource',
+                        'id': 'bar',
+                    }
+                }
+            }
+        },
+        'included': [
+            {
+                'id': 'bar',
+                'type': 'test-related-resource',
+            }
+        ]
+    }
+
+
 def test_client_generated_ids(app: Starlette):
     class TSchema(JSONAPISchema):
         id = fields.Str()
@@ -794,7 +861,7 @@ def test_top_level_meta(app: Starlette):
         type_ = 'test-resource'
         schema = TSchema
 
-        async def get_all(self, *args, **kwargs) -> Response:
+        async def get_many(self, *args, **kwargs) -> Response:
             return await self.to_response(
                 await self.serialize([dict(id=1, name='foo')], many=True),
                 meta={'some-meta-attribute': 'some-meta-value'},
@@ -833,7 +900,7 @@ async def test_before_request_called(monkeypatch):
 
     assert fake_before_request.call_count == 0
 
-    await TResource.handle_get(fake_request)
+    await TResource.handle_request('get', fake_request, extract_params=['id'])
 
     assert fake_before_request.call_count == 1
     assert fake_before_request.call_args_list[0][1] == {
@@ -861,7 +928,7 @@ async def test_after_request_called(monkeypatch):
 
     assert fake_after_request.call_count == 0
 
-    await TResource.handle_get(fake_request)
+    await TResource.handle_request('get', fake_request, extract_params=['id'])
 
     assert fake_after_request.call_count == 1
     assert fake_after_request.call_args_list[0][1] == {
@@ -879,6 +946,51 @@ async def test_after_request_called(monkeypatch):
     monkeypatch.setattr(TBuggyResource, 'after_request', fake_after_request)
 
     assert fake_after_request.call_count == 1
-    r = await TBuggyResource.handle_get(fake_request)
+    r = await TBuggyResource.handle_request('get', fake_request, extract_params=['id'])
     assert r.status_code == 500
     assert fake_after_request.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_before_request_error_caught(monkeypatch):
+    f = Future()  # type: Future
+    f.set_exception(Exception('foo'))
+    fake_before_request = mock.MagicMock(return_value=f)
+    fake_request = mock.MagicMock()
+    fake_request.path_params = {'id': '123'}
+
+    class TResource(BaseResource):
+        pass
+
+    monkeypatch.setattr(TResource, 'before_request', fake_before_request)
+
+    assert fake_before_request.call_count == 0
+    resp = await TResource.handle_request('get', fake_request, extract_params=['id'])
+    assert fake_before_request.call_count == 1
+
+    assert resp.status_code == 500
+    assert json.loads(resp.body)['errors'] == [{'detail': 'Internal server error'}]
+
+
+@pytest.mark.asyncio
+async def test_after_request_error_caught(monkeypatch):
+    f = Future()  # type: Future
+    f.set_exception(Exception('foo'))
+    fake_after_request = mock.MagicMock(return_value=f)
+    fake_request = mock.MagicMock()
+    fake_request.method = 'GET'
+    fake_request.path_params = {'id': '123'}
+
+    class TResource(BaseResource):
+
+        async def get(self, id=None, *args, **kwargs) -> Response:
+            return Response(status_code=200)
+
+    monkeypatch.setattr(TResource, 'after_request', fake_after_request)
+
+    assert fake_after_request.call_count == 0
+    resp = await TResource.handle_request('get', fake_request, extract_params=['id'])
+    assert fake_after_request.call_count == 1
+
+    assert resp.status_code == 500
+    assert json.loads(resp.body)['errors'] == [{'detail': 'Internal server error'}]

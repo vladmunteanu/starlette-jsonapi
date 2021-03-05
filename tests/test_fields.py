@@ -19,8 +19,7 @@ def test_jsonapi_relationship_id_attribute():
         rel = JSONAPIRelationship(
             id_attribute='rel_id',
             schema=OtherSchema,
-            include_resource_linkage=True,
-            type_='bar'
+            type_='bar',
         )
 
     d = TestSchema().dump(dict(rel=dict(id='bar'), rel_id='bar_id', id='foo'))
@@ -47,6 +46,7 @@ def test_jsonapi_relationship_not_rendered():
         id = fields.Str()
         rel = JSONAPIRelationship(
             schema=OtherSchema,
+            include_resource_linkage=False,
             type_='bar'
         )
 
@@ -63,7 +63,7 @@ def test_jsonapi_relationship_routes(app: Starlette):
             type_ = 'others'
             self_route = 'others:get'
             self_route_kwargs = {'id': '<id>'}
-            self_route_many = 'others:get_all'
+            self_route_many = 'others:get_many'
 
     class OtherResource(BaseResource):
         type_ = 'others'
@@ -76,7 +76,6 @@ def test_jsonapi_relationship_routes(app: Starlette):
         id = fields.Str()
         rel = JSONAPIRelationship(
             schema='OtherSchema',
-            include_resource_linkage=True,
             type_='others',
             self_route='',
             related_resource='OtherResource',
@@ -89,7 +88,7 @@ def test_jsonapi_relationship_routes(app: Starlette):
             type_ = 'foo'
             self_route = 'foo:get'
             self_route_kwargs = {'id': '<id>'}
-            self_route_many = 'foo:get_all'
+            self_route_many = 'foo:get_many'
 
     class FooResource(BaseResource):
         type_ = 'foo'

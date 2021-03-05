@@ -1,4 +1,8 @@
+import json
 import logging
+from asyncio import Future
+from typing import Any
+from unittest import mock
 
 import pytest
 from marshmallow_jsonapi import fields
@@ -20,7 +24,6 @@ def relationship_app(app: Starlette):
         rel = JSONAPIRelationship(
             schema='TRelatedSchema',
             type_='test-related-resource',
-            include_resource_linkage=True,
         )
 
         class Meta:
@@ -124,7 +127,8 @@ def test_relationship_resource(relationship_app: Starlette):
     assert rv.headers['Content-Type'] == 'application/vnd.api+json'
     assert rv.json() == {
         'errors': [
-            {'detail': 'Must include a `data` key'}
+            {'detail': 'Must include a `data` key'},
+            {'detail': 'Bad Request'},
         ]
     }
 
@@ -142,7 +146,8 @@ def test_relationship_resource(relationship_app: Starlette):
     assert rv.headers['Content-Type'] == 'application/vnd.api+json'
     assert rv.json() == {
         'errors': [
-            {'detail': 'Must have an `id` field'}
+            {'detail': 'Must have an `id` field'},
+            {'detail': 'Bad Request'},
         ]
     }
 
@@ -156,7 +161,6 @@ def relationship_many_app(app: Starlette):
         rel_many = JSONAPIRelationship(
             schema='TRelatedSchema',
             type_='test-related-resource',
-            include_resource_linkage=True,
             many=True
         )
 
@@ -291,7 +295,8 @@ def test_relationship_many_resource(relationship_many_app: Starlette):
     assert rv.headers['Content-Type'] == 'application/vnd.api+json'
     assert rv.json() == {
         'errors': [
-            {'detail': 'Must include a `data` key'}
+            {'detail': 'Must include a `data` key'},
+            {'detail': 'Bad Request'},
         ]
     }
 
@@ -309,7 +314,8 @@ def test_relationship_many_resource(relationship_many_app: Starlette):
     assert rv.headers['Content-Type'] == 'application/vnd.api+json'
     assert rv.json() == {
         'errors': [
-            {'detail': 'Must have an `id` field'}
+            {'detail': 'Must have an `id` field'},
+            {'detail': 'Bad Request'},
         ]
     }
 
@@ -328,7 +334,8 @@ def test_relationship_many_resource(relationship_many_app: Starlette):
     assert rv.headers['Content-Type'] == 'application/vnd.api+json'
     assert rv.json() == {
         'errors': [
-            {'detail': 'Relationship is list-like'}
+            {'detail': 'Relationship is list-like'},
+            {'detail': 'Bad Request'},
         ]
     }
 
@@ -486,9 +493,6 @@ def test_method_not_allowed_relationship_resource(app: Starlette):
     test_client = TestClient(app)
     rv = test_client.get('/test-resource/foo/relationships/rel')
     assert rv.status_code == 405
-    assert rv.json() == {
-        'errors': [{'detail': 'Method Not Allowed'}]
-    }
 
 
 def test_relationship_resource_register_routes_missing_parent_type(app: Starlette):
@@ -540,7 +544,7 @@ def relationship_links_app(app: Starlette):
             type_ = 'test-related-resource'
             self_route = 'test-related-resource:get'
             self_route_kwargs = {'id': '<id>'}
-            self_route_many = 'test-related-resource:get_all'
+            self_route_many = 'test-related-resource:get_many'
 
     class TRelatedResource(BaseResource):
         type_ = 'test-related-resource'
@@ -558,14 +562,13 @@ def relationship_links_app(app: Starlette):
             related_resource='TRelatedResource',
             related_route='test-resource:rel',
             related_route_kwargs={'id': '<id>'},
-            include_resource_linkage=True,
         )
 
         class Meta:
             type_ = 'test-resource'
             self_route = 'test-resource:get'
             self_route_kwargs = {'id': '<id>'}
-            self_route_many = 'test-resource:get_all'
+            self_route_many = 'test-resource:get_many'
 
     class TResource(BaseResource):
         type_ = 'test-resource'
@@ -735,7 +738,6 @@ def test_relationship_resource_top_level_meta(app: Starlette):
         rel = JSONAPIRelationship(
             schema='TRelatedSchema',
             type_='test-related-resource',
-            include_resource_linkage=True,
         )
 
         class Meta:
@@ -780,3 +782,113 @@ def test_relationship_resource_top_level_meta(app: Starlette):
         },
         'meta': {'some-meta-attribute': 'some-meta-value'},
     }
+
+
+@pytest.mark.asyncio
+async def test_relationship_resource_before_request_called(monkeypatch):
+    f = Future()  # type: Future
+    f.set_result('foo')
+    fake_before_request = mock.MagicMock(return_value=f)
+    fake_request = mock.MagicMock()
+    fake_request.method = 'GET'
+    fake_request.path_params = {'parent_id': '123'}
+
+    class TRelationshipResource(BaseRelationshipResource):
+        pass
+
+    monkeypatch.setattr(TRelationshipResource, 'before_request', fake_before_request)
+
+    assert fake_before_request.call_count == 0
+
+    await TRelationshipResource.handle_request('get', fake_request)
+
+    assert fake_before_request.call_count == 1
+    assert fake_before_request.call_args_list[0][1] == {
+        'request': fake_request,
+        'request_context': {},
+    }
+
+
+@pytest.mark.asyncio
+async def test_relationship_resource_before_request_error_caught(monkeypatch):
+    f = Future()  # type: Future
+    f.set_exception(Exception('foo'))
+    fake_before_request = mock.MagicMock(return_value=f)
+    fake_request = mock.MagicMock()
+    fake_request.path_params = {'parent_id': '123'}
+
+    class TRelationshipResource(BaseRelationshipResource):
+        pass
+
+    monkeypatch.setattr(TRelationshipResource, 'before_request', fake_before_request)
+
+    assert fake_before_request.call_count == 0
+    resp = await TRelationshipResource.handle_request('get', fake_request)
+    assert fake_before_request.call_count == 1
+
+    assert json.loads(resp.body)['errors'] == [{'detail': 'Internal server error'}]
+    assert resp.status_code == 500
+
+
+@pytest.mark.asyncio
+async def test_relationship_resource_after_request_called(monkeypatch):
+    f = Future()  # type: Future
+    f.set_result('foo')
+    fake_after_request = mock.MagicMock(return_value=f)
+    fake_request = mock.MagicMock()
+    fake_request.method = 'GET'
+    fake_request.path_params = {'parent_id': '123'}
+    fake_response = mock.MagicMock()
+
+    class TRelationshipResource(BaseRelationshipResource):
+
+        async def get(self, parent_id, *args, **kwargs) -> Response:
+            return fake_response
+
+    monkeypatch.setattr(TRelationshipResource, 'after_request', fake_after_request)
+
+    assert fake_after_request.call_count == 0
+    await TRelationshipResource.handle_request('get', fake_request, extract_params=['parent_id'])
+    assert fake_after_request.call_count == 1
+    assert fake_after_request.call_args_list[0][1] == {
+        'request': fake_request,
+        'request_context': {'parent_id': '123'},
+        'response': fake_response,
+    }
+
+    # check that after_request is called when an exception is raised
+    class TBuggyResource(BaseRelationshipResource):
+
+        async def get(self, parent_id, *args, **kwargs) -> Response:
+            raise Exception('something bad happened')
+
+    monkeypatch.setattr(TBuggyResource, 'after_request', fake_after_request)
+
+    assert fake_after_request.call_count == 1
+    r = await TBuggyResource.handle_request('get', fake_request, extract_params=['parent_id'])
+    assert r.status_code == 500
+    assert fake_after_request.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_relationship_resource_after_request_error_caught(monkeypatch):
+    f = Future()  # type: Future
+    f.set_exception(Exception('foo'))
+    fake_after_request = mock.MagicMock(return_value=f)
+    fake_request = mock.MagicMock()
+    fake_request.method = 'GET'
+    fake_request.path_params = {'parent_id': '123'}
+
+    class TRelationshipResource(BaseRelationshipResource):
+
+        async def get(self, parent_id: Any, *args, **kwargs) -> Response:
+            return Response(status_code=200)
+
+    monkeypatch.setattr(TRelationshipResource, 'after_request', fake_after_request)
+
+    assert fake_after_request.call_count == 0
+    resp = await TRelationshipResource.handle_request('get', fake_request)
+    assert fake_after_request.call_count == 1
+
+    assert resp.status_code == 500
+    assert json.loads(resp.body)['errors'] == [{'detail': 'Internal server error'}]

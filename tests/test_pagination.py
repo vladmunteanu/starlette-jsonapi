@@ -195,7 +195,7 @@ def pagination_app(app: Starlette):
         schema = TSchema
         pagination_class = TPagination
 
-        async def get_all(self, *args, **kwargs) -> Response:
+        async def get_many(self, *args, **kwargs) -> Response:
             data = [
                 dict(id=1, name='foo'),
                 dict(id=2, name='foo'),
