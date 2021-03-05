@@ -45,7 +45,7 @@ class TeamsResource(BaseResource):
     schema = TeamSchema
     id_mask = 'int'
 
-    async def prepare_relations(self, obj: Team, relations: List[str]):
+    async def include_relations(self, obj: Team, relations: List[str]):
         """
         We override this to allow `included` requests against this resource.
         """

@@ -301,7 +301,7 @@ def included_app(app: Starlette):
         type_ = 'test-resource'
         schema = TSchema
 
-        async def prepare_relations(self, obj: Any, relations: List[str]) -> None:
+        async def include_relations(self, obj: Any, relations: List[str]) -> None:
             return None
 
         async def get(self, id=None, *args, **kwargs) -> Response:
@@ -427,7 +427,7 @@ def test_included_data_many(included_app: Starlette):
 
 
 def test_no_included_data(included_app: Starlette):
-    # if resource does not override `prepare_relations`,
+    # if resource does not override `include_relations`,
     # a 400 error should be returned.
     test_client = TestClient(app=included_app)
     rv = test_client.get('/test-resource-not-included/foo?include=rel')

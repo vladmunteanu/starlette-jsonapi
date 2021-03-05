@@ -49,7 +49,7 @@ class UsersResource(BaseResourceSQLA):
         super().__init__(*args, **kwargs)
         self.session = Session()
 
-    async def prepare_relations(self, obj: User, relations: List[str]):
+    async def include_relations(self, obj: User, relations: List[str]):
         """ We override this to allow include requests. """
         # sqlalchemy supports lazy loading of relationships,
         # so we don't need to load them manually,

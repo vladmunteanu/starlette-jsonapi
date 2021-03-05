@@ -43,7 +43,7 @@ class UsersResource(BaseResource):
     schema = UserSchema
     id_mask = 'int'
 
-    async def prepare_relations(self, obj: User, relations: List[str]):
+    async def include_relations(self, obj: User, relations: List[str]):
         if 'organization' in relations:
             await obj.fetch_related('organization')
 

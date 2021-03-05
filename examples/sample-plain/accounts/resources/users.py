@@ -41,7 +41,7 @@ class UsersResource(BaseResource):
     schema = UserSchema
     id_mask = 'int'
 
-    async def prepare_relations(self, obj: User, relations: List[str]):
+    async def include_relations(self, obj: User, relations: List[str]):
         """
         We override this to allow `included` requests against this resource,
         but we don't actually have to do anything here.

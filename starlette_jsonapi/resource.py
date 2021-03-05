@@ -173,7 +173,7 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
     Additionally:
 
         - requests for compound documents (Example: ``GET /api/v1/articles?include=author``) can be
-          supported by overriding :meth:`prepare_relations` to pre-populate
+          supported by overriding :meth:`include_relations` to pre-populate
           the related objects before serializing.
 
         - requests for related objects (Example: ``GET /api/v1/articles/123/author``), can be supported
@@ -287,7 +287,7 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
         """
         raise JSONAPIException(status_code=405)
 
-    async def prepare_relations(self, obj: Any, relations: List[str]) -> None:
+    async def include_relations(self, obj: Any, relations: List[str]) -> None:
         """
         Subclasses should implement this to support requests for compound documents.
         `<https://jsonapi.org/format/#document-compound-documents>`_
@@ -531,7 +531,7 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
 
     async def _prepare_included(self, data: Any, many: bool) -> Optional[List[str]]:
         """
-        Processes the ``include`` query parameter and calls :meth:`prepare_relations`
+        Processes the ``include`` query parameter and calls :meth:`include_relations`
         for every object in ``data``, to enable requests for compound documents.
         """
         include_param = parse_included_params(self.request)
@@ -540,9 +540,9 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
         include_param_list = list(include_param)
         if many is True:
             for item in data:
-                await self.prepare_relations(obj=item, relations=include_param_list)
+                await self.include_relations(obj=item, relations=include_param_list)
         else:
-            await self.prepare_relations(obj=data, relations=include_param_list)
+            await self.include_relations(obj=data, relations=include_param_list)
         return include_param_list
 
 
