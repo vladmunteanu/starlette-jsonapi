@@ -4,4 +4,4 @@ tortoise-orm
 marshmallow
 marshmallow-jsonapi
 
-git+ssh://git@github.com/vladmunteanu/starlette-jsonapi
+starlette-jsonapi

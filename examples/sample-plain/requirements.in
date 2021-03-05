@@ -3,4 +3,4 @@ starlette
 marshmallow
 marshmallow_jsonapi
 
-git+ssh://git@github.com/vladmunteanu/starlette-jsonapi
+starlette-jsonapi
