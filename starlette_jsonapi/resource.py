@@ -8,9 +8,11 @@ from starlette.requests import Request
 from starlette.responses import Response
 from starlette.routing import Route, Mount
 
+from starlette_jsonapi.constants import CONTENT_TYPE_HEADER
 from starlette_jsonapi.exceptions import JSONAPIException, HTTPException
 from starlette_jsonapi.fields import JSONAPIRelationship
-from starlette_jsonapi.meta import RegisteredResourceMeta
+from starlette_jsonapi.meta import RegisteredResourceMeta, OpenAPIInfoMeta
+from starlette_jsonapi.openapi import with_openapi_info
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
 from starlette_jsonapi.pagination import BasePagination, Pagination
@@ -255,26 +257,81 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
     #: Used in :meth:`serialize_related`.
     _related: Dict[str, Type['BaseResource']]
 
+    from starlette_jsonapi.openapi import response_for_exc
+
+    openapi_info = {
+        'handlers': {
+            'get': {
+                'description': (
+                    'Retrieve an item by its id. '
+                    'Details: https://jsonapi.org/format/#fetching-resources'
+                ),
+                'responses': response_for_exc(JSONAPIException, 500)
+            },
+            'patch': {
+                'description': (
+                    'Update an item by its id. '
+                    'Details: https://jsonapi.org/format/#crud-updating'
+                ),
+                'responses': response_for_exc(JSONAPIException, 500)
+            },
+            'delete': {
+                'description': (
+                    'Delete an item by its id. '
+                    'Details: https://jsonapi.org/format/#crud-deleting'
+                ),
+                'responses': response_for_exc(JSONAPIException, 500)
+            },
+            'post': {
+                'description': (
+                    'Create an item. '
+                    'Details: https://jsonapi.org/format/#crud-creating'
+                ),
+                'responses': response_for_exc(JSONAPIException, 500)
+            },
+            'get_many': {
+                'description': (
+                    'Retrieve a list of items. '
+                    'Details: https://jsonapi.org/format/#fetching-resources'
+                ),
+                'responses': response_for_exc(JSONAPIException, 500)
+            },
+            'get_related': {
+                'description': (
+                    'Retrieve a related item. '
+                    'Details: https://jsonapi.org/format/#fetching-resources'
+                ),
+                'responses': response_for_exc(JSONAPIException, 500)
+            },
+        },
+    }
+
+    @with_openapi_info(responses={"405": JSONAPIException(status_code=405)})
     async def get(self, id: Any, *args, **kwargs) -> Response:
         """ Subclasses should implement this to handle ``GET /<id>`` requests. """
         raise JSONAPIException(status_code=405)
 
+    @with_openapi_info(responses={"405": JSONAPIException(status_code=405)})
     async def patch(self, id: Any, *args, **kwargs) -> Response:
         """ Subclasses should implement this to handle ``PATCH /<id>`` requests. """
         raise JSONAPIException(status_code=405)
 
+    @with_openapi_info(responses={"405": JSONAPIException(status_code=405)})
     async def delete(self, id: Any, *args, **kwargs) -> Response:
         """ Subclasses should implement this to handle ``DELETE /<id>`` requests. """
         raise JSONAPIException(status_code=405)
 
+    @with_openapi_info(responses={"405": JSONAPIException(status_code=405)})
     async def get_many(self, *args, **kwargs) -> Response:
         """ Subclasses should implement this to handle ``GET /`` requests. """
         raise JSONAPIException(status_code=405)
 
+    @with_openapi_info(responses={"405": JSONAPIException(status_code=405)})
     async def post(self, *args, **kwargs) -> Response:
         """ Subclasses should implement this to handle ``POST /`` requests. """
         raise JSONAPIException(status_code=405)
 
+    @with_openapi_info(responses={"405": JSONAPIException(status_code=405)})
     async def get_related(self, id: Any, relationship: str, related_id: Any = None, *args, **kwargs) -> Response:
         """
         Subclasses should implement this to handle ``GET /<id>/<relationship>[/<related_id>]``.
@@ -327,10 +384,10 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
         :raises: :exc:`starlette_jsonapi.exceptions.JSONAPIException`
         """
         content_type = self.request.headers.get('content-type')
-        if self.request.method in ('POST', 'PATCH') and content_type != 'application/vnd.api+json':
+        if self.request.method in ('POST', 'PATCH') and content_type != CONTENT_TYPE_HEADER:
             raise JSONAPIException(
                 status_code=400,
-                detail='Incorrect or missing Content-Type header, expected `application/vnd.api+json`.',
+                detail=f'Incorrect or missing Content-Type header, expected `{CONTENT_TYPE_HEADER}`.',
             )
         try:
             body = await self.request.json()
@@ -459,37 +516,38 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
                     cls._related[fname] = field.related_resource_class
 
         # attach secondary related routes, example: /articles/1/author/1
-        routes = [
-            Route(
-                '/{{id:{}}}/{}/{{related_id:{}}}'.format(cls.id_mask, rel_name, rel_class.id_mask),
-                functools.partial(
-                    cls.handle_request,
-                    'get_related',
-                    relationship=rel_name,
-                    extract_params=['id', 'related_id'],
-                    request_context={'relationship': rel_name},
-                ),
-                methods=['GET'],
-                name=f'{rel_name}-id',
+        routes = []
+        for rel_name, rel_class in cls._related.items():
+            rel_field = cls.schema.get_fields().get(rel_name)
+            if rel_field and getattr(rel_field, 'many', False):
+                routes.append(
+                    Route(
+                        '/{{id:{}}}/{}/{{related_id:{}}}'.format(cls.id_mask, rel_name, rel_class.id_mask),
+                        functools.partial(
+                            cls.handle_request,
+                            'get_related',
+                            relationship=rel_name,
+                            extract_params=['id', 'related_id'],
+                            request_context={'relationship': rel_name},
+                        ),
+                        methods=['GET'],
+                        name=f'{rel_name}-id',
+                    )
+                )
+            routes.append(
+                Route(
+                    '/{{id:{}}}/{}'.format(cls.id_mask, rel_name),
+                    functools.partial(
+                        cls.handle_request,
+                        'get_related',
+                        relationship=rel_name,
+                        extract_params=['id'],
+                        request_context={'relationship': rel_name},
+                    ),
+                    methods=['GET'],
+                    name=rel_name,
+                )
             )
-            for rel_name, rel_class in cls._related.items()
-        ]
-        # attach related routes, example: /articles/1/author
-        routes += [
-            Route(
-                '/{{id:{}}}/{}'.format(cls.id_mask, rel_name),
-                functools.partial(
-                    cls.handle_request,
-                    'get_related',
-                    relationship=rel_name,
-                    extract_params=['id'],
-                    request_context={'relationship': rel_name},
-                ),
-                methods=['GET'],
-                name=rel_name,
-            )
-            for rel_name in cls._related
-        ]
 
         # attach primary routes, example: /articles/ and /articles/1
         routes += [
@@ -546,7 +604,7 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
         return include_param_list
 
 
-class BaseRelationshipResource(_BaseResourceHandler):
+class BaseRelationshipResource(_BaseResourceHandler, metaclass=OpenAPIInfoMeta):
     """ A basic json:api relationships resource implementation, data layer agnostic. """
 
     #: The parent resource that this relationship belongs to
@@ -555,18 +613,56 @@ class BaseRelationshipResource(_BaseResourceHandler):
     #: The relationship name, as found on the parent resource schema
     relationship_name: str
 
+    from starlette_jsonapi.openapi import response_for_exc
+    openapi_info = {
+        'handlers': {
+            'get': {
+                'description': (
+                    'Retrieve a (list of) relationship(s). '
+                    'Details: https://jsonapi.org/format/#fetching-relationships'
+                ),
+                'responses': response_for_exc(JSONAPIException, 500)
+            },
+            'patch': {
+                'description': (
+                    'Update a relationship. '
+                    'Details: https://jsonapi.org/format/#crud-updating-relationships'
+                ),
+                'responses': response_for_exc(JSONAPIException, 500)
+            },
+            'delete': {
+                'description': (
+                    'Delete a relationship. '
+                    'Details: https://jsonapi.org/format/#crud-updating-relationships'
+                ),
+                'responses': response_for_exc(JSONAPIException, 500)
+            },
+            'post': {
+                'description': (
+                    'Create a relationship. '
+                    'Details: https://jsonapi.org/format/#crud-updating-relationships'
+                ),
+                'responses': response_for_exc(JSONAPIException, 500)
+            },
+        },
+    }
+
+    @with_openapi_info(responses={"405": JSONAPIException(status_code=405)})
     async def post(self, parent_id: Any, *args, **kwargs) -> Response:
         """ Subclasses should implement this to handle POST /<parent_id>/relationships/<relationship> requests. """
         raise JSONAPIException(status_code=405)
 
+    @with_openapi_info(responses={"405": JSONAPIException(status_code=405)})
     async def get(self, parent_id: Any, *args, **kwargs) -> Response:
         """ Subclasses should implement this to handle GET /<parent_id>/relationships/<relationship> requests. """
         raise JSONAPIException(status_code=405)
 
+    @with_openapi_info(responses={"405": JSONAPIException(status_code=405)})
     async def patch(self, parent_id: Any, *args, **kwargs) -> Response:
         """ Subclasses should implement this to handle PATCH /<parent_id>/relationships/<relationship> requests. """
         raise JSONAPIException(status_code=405)
 
+    @with_openapi_info(responses={"405": JSONAPIException(status_code=405)})
     async def delete(self, parent_id: Any, *args, **kwargs) -> Response:
         """ Subclasses should implement this to handle DELETE /<parent_id>/relationships/<relationship> requests. """
         raise JSONAPIException(status_code=405)
@@ -596,10 +692,10 @@ class BaseRelationshipResource(_BaseResourceHandler):
         json:api validation.
         """
         content_type = self.request.headers.get('content-type')
-        if self.request.method in ('POST', 'PATCH') and content_type != 'application/vnd.api+json':
+        if self.request.method in ('POST', 'PATCH') and content_type != CONTENT_TYPE_HEADER:
             raise JSONAPIException(
                 status_code=400,
-                detail='Incorrect or missing Content-Type header, expected `application/vnd.api+json`.',
+                detail=f'Incorrect or missing Content-Type header, expected `{CONTENT_TYPE_HEADER}`.',
             )
         try:
             body = await self.request.json()

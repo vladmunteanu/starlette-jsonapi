@@ -562,6 +562,7 @@ def relationship_links_app(app: Starlette):
             related_resource='TRelatedResource',
             related_route='test-resource:rel',
             related_route_kwargs={'id': '<id>'},
+            many=True,
         )
 
         class Meta:

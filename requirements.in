@@ -2,6 +2,10 @@ starlette
 marshmallow
 marshmallow-jsonapi
 
+# OpenAPI
+apispec[validation]
+pyyaml
+
 # testing dependencies
 tox
 pytest
@@ -9,3 +13,4 @@ pytest-asyncio
 pytest-cov
 httpx
 requests
+jsonschema
