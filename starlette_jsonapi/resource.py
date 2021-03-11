@@ -11,7 +11,7 @@ from starlette.routing import Route, Mount
 from starlette_jsonapi.constants import CONTENT_TYPE_HEADER
 from starlette_jsonapi.exceptions import JSONAPIException, HTTPException
 from starlette_jsonapi.fields import JSONAPIRelationship
-from starlette_jsonapi.meta import RegisteredResourceMeta, OpenAPIInfoMeta
+from starlette_jsonapi.meta import RegisteredResourceMeta
 from starlette_jsonapi.openapi import with_openapi_info
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
@@ -257,8 +257,6 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
     #: Used in :meth:`serialize_related`.
     _related: Dict[str, Type['BaseResource']]
 
-    from starlette_jsonapi.openapi import response_for_exc
-
     openapi_info = {
         'handlers': {
             'get': {
@@ -266,42 +264,42 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
                     'Retrieve an item by its id. '
                     'Details: https://jsonapi.org/format/#fetching-resources'
                 ),
-                'responses': response_for_exc(JSONAPIException, 500)
+                'responses': {'500': JSONAPIException},
             },
             'patch': {
                 'description': (
                     'Update an item by its id. '
                     'Details: https://jsonapi.org/format/#crud-updating'
                 ),
-                'responses': response_for_exc(JSONAPIException, 500)
+                'responses': {'500': JSONAPIException},
             },
             'delete': {
                 'description': (
                     'Delete an item by its id. '
                     'Details: https://jsonapi.org/format/#crud-deleting'
                 ),
-                'responses': response_for_exc(JSONAPIException, 500)
+                'responses': {'500': JSONAPIException},
             },
             'post': {
                 'description': (
                     'Create an item. '
                     'Details: https://jsonapi.org/format/#crud-creating'
                 ),
-                'responses': response_for_exc(JSONAPIException, 500)
+                'responses': {'500': JSONAPIException},
             },
             'get_many': {
                 'description': (
                     'Retrieve a list of items. '
                     'Details: https://jsonapi.org/format/#fetching-resources'
                 ),
-                'responses': response_for_exc(JSONAPIException, 500)
+                'responses': {'500': JSONAPIException},
             },
             'get_related': {
                 'description': (
                     'Retrieve a related item. '
                     'Details: https://jsonapi.org/format/#fetching-resources'
                 ),
-                'responses': response_for_exc(JSONAPIException, 500)
+                'responses': {'500': JSONAPIException},
             },
         },
     }
@@ -604,7 +602,7 @@ class BaseResource(_BaseResourceHandler, metaclass=RegisteredResourceMeta):
         return include_param_list
 
 
-class BaseRelationshipResource(_BaseResourceHandler, metaclass=OpenAPIInfoMeta):
+class BaseRelationshipResource(_BaseResourceHandler):
     """ A basic json:api relationships resource implementation, data layer agnostic. """
 
     #: The parent resource that this relationship belongs to
@@ -613,7 +611,6 @@ class BaseRelationshipResource(_BaseResourceHandler, metaclass=OpenAPIInfoMeta):
     #: The relationship name, as found on the parent resource schema
     relationship_name: str
 
-    from starlette_jsonapi.openapi import response_for_exc
     openapi_info = {
         'handlers': {
             'get': {
@@ -621,28 +618,28 @@ class BaseRelationshipResource(_BaseResourceHandler, metaclass=OpenAPIInfoMeta):
                     'Retrieve a (list of) relationship(s). '
                     'Details: https://jsonapi.org/format/#fetching-relationships'
                 ),
-                'responses': response_for_exc(JSONAPIException, 500)
+                'responses': {'500': JSONAPIException},
             },
             'patch': {
                 'description': (
                     'Update a relationship. '
                     'Details: https://jsonapi.org/format/#crud-updating-relationships'
                 ),
-                'responses': response_for_exc(JSONAPIException, 500)
+                'responses': {'500': JSONAPIException},
             },
             'delete': {
                 'description': (
                     'Delete a relationship. '
                     'Details: https://jsonapi.org/format/#crud-updating-relationships'
                 ),
-                'responses': response_for_exc(JSONAPIException, 500)
+                'responses': {'500': JSONAPIException},
             },
             'post': {
                 'description': (
                     'Create a relationship. '
                     'Details: https://jsonapi.org/format/#crud-updating-relationships'
                 ),
-                'responses': response_for_exc(JSONAPIException, 500)
+                'responses': {'500': JSONAPIException},
             },
         },
     }

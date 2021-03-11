@@ -4,7 +4,6 @@
 # test additional parameters passed to openapi
 # test relationship resource
 # test with_openapi_info overwrites values from class
-import sys
 from collections import OrderedDict
 from typing import Any, List, Union, Dict, Type
 
@@ -22,24 +21,9 @@ from starlette_jsonapi.resource import BaseResource, BaseRelationshipResource
 from starlette_jsonapi.schema import JSONAPISchema
 from starlette_jsonapi.meta import registered_resources
 from starlette_jsonapi.openapi import (
-    JSONAPISchemaGenerator, JSONAPIMarshmallowPlugin, preregistered_schemas,
+    JSONAPISchemaGenerator, JSONAPIMarshmallowPlugin,
     with_openapi_info, response_for_relationship,
 )
-
-
-@pytest.fixture(autouse=True)
-def clear_imports():
-    yield
-    # Clear resource module import since we want
-    # BaseResource and BaseRelationshipResource
-    # to pre-register exceptions for every test.
-    sys.modules.pop('starlette_jsonapi.resource', None)
-
-
-@pytest.fixture(autouse=True)
-def clear_preregistered_schemas():
-    yield
-    preregistered_schemas.clear()
 
 
 @pytest.fixture
@@ -293,7 +277,6 @@ def test_response_schema(openapi_app: Starlette, openapi_schema_as_dict):
         }
     }
 
-    openapi_app.schema_generator.preregister_schemas()
     assert validate_spec(openapi_app.schema_generator.spec) is True
 
 
@@ -309,13 +292,7 @@ def test_exception_schema(openapi_app: Starlette, openapi_schema_as_dict):
             'errors': {
                 'type': 'array',
                 'items': {
-                    'type': 'object',
-                    'properties': {
-                        'detail': {
-                            'type': 'string',
-                            'enum': [ResourceNotFound.detail]
-                        }
-                    }
+                    '$ref': '#/components/schemas/ResourceNotFound-404-detail',
                 }
             }
         }
@@ -324,12 +301,11 @@ def test_exception_schema(openapi_app: Starlette, openapi_schema_as_dict):
     assert get_url in schema['paths']
     assert schema['paths'][get_url]['get']['responses']['404']['content'][CONTENT_TYPE_HEADER] == {
         'schema': {
-            '$ref': '#/components/schemas/ResourceNotFound-404'
+            '$ref': '#/components/schemas/ResourceNotFound-404',
         }
     }
 
     assert exc_schema == expected_exc_schema
-    openapi_app.schema_generator.preregister_schemas()
     assert validate_spec(openapi_app.schema_generator.spec) is True
 
 
@@ -359,7 +335,6 @@ def test_request_schema(openapi_app: Starlette, openapi_schema_as_dict):
     assert schema['components']['schemas'][patch_schema_name] == request_schema
     request_schema['properties']['id']['readOnly'] = True
     assert schema['components']['schemas'][post_schema_name] == request_schema
-    openapi_app.schema_generator.preregister_schemas()
     assert validate_spec(openapi_app.schema_generator.spec) is True
 
 
@@ -398,7 +373,6 @@ def test_response_for_relationships(openapi_resources, openapi_app: Starlette, o
             }
         }
     }
-    openapi_app.schema_generator.preregister_schemas()
     assert validate_spec(openapi_app.schema_generator.spec) is True
 
 
@@ -488,13 +462,33 @@ def test_path_parameters(app: Starlette, openapi_schema_as_dict):
         {'name': 'parent_id', 'in': 'path', 'required': True, 'schema': {'type': 'integer'}},
     ]
 
-    app.schema_generator.preregister_schemas()
     assert validate_spec(app.schema_generator.spec) is True
 
 
 # test resource openapi info is included
-# def test_resource_openapi_info_included(openapi_app: Starlette, openapi_schema_as_dict):
-#     assert False, 'ToDo'
+def test_resource_openapi_info_included(app: Starlette, openapi_schema_as_dict):
+    class TResourceSchema(JSONAPISchema):
+        id = fields.String()
+        description = fields.String()
+
+        class Meta:
+            type_ = 'test'
+
+    class TResourceInt(BaseResource):
+        schema = TResourceSchema
+        type_ = 'test'
+
+        openapi_info = {
+            'handlers': {
+                'get': {
+                    'description': 'Test description from class'
+                }
+            }
+        }
+
+    TResourceInt.register_routes(app)
+    schema = openapi_schema_as_dict(app)
+    assert schema['paths']['/test/{id}']['get']['description'] == 'Test description from class'
 
 
 # test base resource openapi info is included
