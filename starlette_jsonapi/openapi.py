@@ -32,7 +32,9 @@ SchemaOrExceptionType = Union[SchemaType, Exception, Type[Exception]]
 
 EXPECTED_PATH_PARAMETERS = ['id', 'related_id', 'parent_id']
 
-preregistered_schemas: Dict[str, ExceptionSchemaInfo] = {}
+PATH_PARAMS_REGEX = '({{({}):({})}})'.format(
+    '|'.join(EXPECTED_PATH_PARAMETERS), '|'.join(CONVERTOR_TYPES.keys())
+)
 
 
 class BaseExceptionSchema(Schema):
@@ -88,6 +90,7 @@ class JSONAPISchemaConverter(OpenAPIConverter):
             else:
                 properties.setdefault('attributes', {'type': 'object', 'properties': {}})
                 properties['attributes']['properties'][observed_field_name] = prop
+            # TODO: support meta fields
 
             if field_obj.required:
                 if not partial or (
@@ -171,14 +174,12 @@ class JSONAPISchemaGenerator(BaseSchemaGenerator):
         from starlette_jsonapi.resource import BaseRelationshipResource, BaseResource
 
         endpoints_info = self.get_endpoints(routes)
-        params_path_regex = '({{({}):({})}})'.format(
-            '|'.join(EXPECTED_PATH_PARAMETERS), '|'.join(CONVERTOR_TYPES.keys())
-        )
 
         for endpoint in endpoints_info:
             openapi_info = {}  # type: dict
             path_params = []
             tags = None
+            # we expect endpoint.func to be handle_request, wrapped in a functools.partial
             if isinstance(endpoint.func, functools.partial):
                 obj = endpoint.func
                 last_partial = obj
@@ -187,35 +188,32 @@ class JSONAPISchemaGenerator(BaseSchemaGenerator):
                     obj = obj.func  # type: ignore
 
                 # get resource class and handler
-                handler_cls = obj.__self__  # type: Type[Union[BaseResource, BaseRelationshipResource]]
-                handler = getattr(handler_cls, last_partial.args[0], None)
-                if not issubclass(handler_cls, (BaseResource, BaseRelationshipResource)):
-                    continue
+                handler_cls = getattr(obj, '__self__', None)
+                if handler_cls and issubclass(handler_cls, (BaseResource, BaseRelationshipResource)):
+                    handler = getattr(handler_cls, last_partial.args[0], None)
+                    # traverse the reversed MRO of handler_cls, compute openapi_info
+                    openapi_info = compute_base_openapi_info(handler_cls).get('handlers', {}).get(handler.__name__)
+                    openapi_info['responses'] = process_responses(openapi_info.get('responses', {}))
 
-                # traverse the reversed MRO of handler_cls, compute openapi_info
-                openapi_info = compute_base_openapi_info(handler_cls).get('handlers', {}).get(handler.__name__)
-                openapi_info['responses'] = process_responses(openapi_info.get('responses', {}))
+                    # add tags based on resource class
+                    tags = []
+                    if issubclass(handler_cls, BaseResource):
+                        tags.append(handler_cls.register_as or handler_cls.type_)
+                    else:
+                        tags.append(handler_cls.parent_resource.register_as or handler_cls.parent_resource.type_)
 
-                # add tags based on resource class
-                tags = []
-                if issubclass(handler_cls, BaseResource):
-                    tags.append(handler_cls.register_as or handler_cls.type_)
-                elif issubclass(handler_cls, BaseRelationshipResource):
-                    tags.append(handler_cls.parent_resource.register_as or handler_cls.parent_resource.type_)
-
-                # compute schema for handler, merging openapi_info added by @with_openapi_info
-                if handler:
+                    # compute schema for handler, merging openapi_info added by @with_openapi_info
                     openapi_info = safe_merge(openapi_info, getattr(handler, OPENAPI_INFO, {}))
                     if tags:
                         openapi_info.update(tags=tags)
                     if not openapi_info.pop('include_in_schema', True):
                         continue
-                else:
-                    continue
+
+                    path_params = openapi_info.get('parameters', [])
 
             # add path parameters
             new_path = endpoint.path
-            groups = re.findall(params_path_regex, endpoint.path)
+            groups = re.findall(PATH_PARAMS_REGEX, endpoint.path)
             if groups:
                 for group in groups:
                     path_params.append(
@@ -226,6 +224,7 @@ class JSONAPISchemaGenerator(BaseSchemaGenerator):
                             'schema': {'type': get_openapi_parameter_type(group[2])}
                         }
                     )
+                    # transform {<param_name>:<param_type>} into {<param_name>}
                     new_path = new_path.replace(group[0], '{' + group[1] + '}')
 
             self.spec.path(path=new_path, operations={endpoint.http_method: openapi_info}, parameters=path_params)
@@ -239,7 +238,6 @@ def compute_base_openapi_info(klass: Type[Any]) -> dict:
     for base_klass in reversed(klass.__mro__):
         if issubclass(base_klass, (BaseResource, BaseRelationshipResource)):
             base_openapi_info = getattr(base_klass, OPENAPI_INFO, {})
-            base_openapi_info['responses'] = process_responses(base_openapi_info.get('responses', {}))
             openapi_info = safe_merge(openapi_info, base_openapi_info)
     return openapi_info
 
@@ -363,7 +361,7 @@ def response_for_relationship(schema: Union[JSONAPISchema, Type[JSONAPISchema]],
         'content': {
             CONTENT_TYPE_HEADER: {'schema': {'type': 'object', 'properties': {'data': rel_item_schema}}}
         },
-        'description': 'Example relationship response'
+        'description': 'Example relationship response',
     }
 
 
@@ -389,4 +387,4 @@ def request_for_schema(
             }
         )
 
-    return {'content': {CONTENT_TYPE_HEADER: {'schema': schema}}}
+    return {'content': {CONTENT_TYPE_HEADER: {'schema': schema}}, 'required': True}

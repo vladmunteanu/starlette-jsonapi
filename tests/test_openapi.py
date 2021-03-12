@@ -1,8 +1,6 @@
-# test schema renders with correct types
-# test schema is enclosed
-# test response body with difference between patch and post
-# test additional parameters passed to openapi
-# test relationship resource
+# test additional parameters passed to with_openapi_info
+# test parameters are extended instead of replaced
+# test relationship resource with many
 # test with_openapi_info overwrites values from class
 from collections import OrderedDict
 from typing import Any, List, Union, Dict, Type
@@ -312,7 +310,7 @@ def test_exception_schema(openapi_app: Starlette, openapi_schema_as_dict):
 def test_request_schema(openapi_app: Starlette, openapi_schema_as_dict):
     TParentResource = registered_resources['TParentResource']
     TParentResource.patch = with_openapi_info(request_body=TParentResource.schema)(TParentResource.patch)
-    TParentResource.post = with_openapi_info(request_body=TParentResource.schema)(TParentResource.post)
+    TParentResource.post = with_openapi_info(request_body=TParentResource.schema())(TParentResource.post)
     schema = openapi_schema_as_dict(openapi_app)
     patch_schema_name = TParentResource.schema.__name__ + "-patch"
     post_schema_name = TParentResource.schema.__name__ + "-post"
@@ -374,6 +372,97 @@ def test_response_for_relationships(openapi_resources, openapi_app: Starlette, o
         }
     }
     assert validate_spec(openapi_app.schema_generator.spec) is True
+
+
+def test_response_for_relationships_many(app: Starlette, openapi_schema_as_dict):
+    class TResourceSchema(JSONAPISchema):
+        id = fields.String()
+        name = fields.String()
+
+        class Meta:
+            type_ = 'test'
+
+    class TResource(BaseResource):
+        schema = TResourceSchema
+        type_ = 'test'
+
+    class TRelatedResourceSchema(JSONAPISchema):
+        id = fields.String()
+        description = fields.String()
+
+        rel = JSONAPIRelationship(
+            type_=TResource.type_,
+            schema=TResourceSchema,
+            many=True,
+            related_resource=TResource,
+        )
+
+        class Meta:
+            type_ = 'test-related'
+
+    class TResourceRelated(BaseResource):
+        schema = TRelatedResourceSchema
+        type_ = 'test-related'
+
+    class TResourceRelationship(BaseRelationshipResource):
+        parent_resource = TResourceRelated
+        relationship_name = 'rel'
+
+        @with_openapi_info(
+            responses={
+                '200': response_for_relationship(schema=TResourceRelated.schema, relationship_name=relationship_name),
+            }
+        )
+        async def get(self, parent_id: Any, *args, **kwargs) -> Response:
+            pass
+
+    TResource.register_routes(app)
+    TResourceRelated.register_routes(app)
+    TResourceRelationship.register_routes(app)
+
+    schema = openapi_schema_as_dict(app)
+    relationships_url = ''.join(
+        [
+            '/', TResourceRelationship.parent_resource.type_,
+            '/{parent_id}/relationships/', TResourceRelationship.relationship_name
+        ]
+    )
+    assert relationships_url in schema['paths']
+    rel_field = TResourceRelationship.parent_resource.schema.get_fields()[TResourceRelationship.relationship_name]
+    assert isinstance(rel_field, JSONAPIRelationship)
+    assert schema['paths'][relationships_url]['get']['responses']['200']['content'][CONTENT_TYPE_HEADER] == {
+        'schema': {
+            'type': 'object',
+            'properties': {
+                'data': {
+                    'type': 'array',
+                    'items': {
+                        'type': 'object',
+                        'properties': {
+                            'id': {'type': 'string'},
+                            'type': {'type': 'string', 'enum': [rel_field.type_]},
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert validate_spec(app.schema_generator.spec) is True
+
+
+def test_response_for_relationships_invalid_field(app: Starlette):
+    class TResourceSchema(JSONAPISchema):
+        id = fields.String()
+        name = fields.String()
+
+        class Meta:
+            type_ = 'test'
+
+    with pytest.raises(ValueError):
+        response_for_relationship(TResourceSchema, 'name')
+
+    with pytest.raises(KeyError):
+        response_for_relationship(TResourceSchema, 'unknown')
 
 
 def test_path_parameters(app: Starlette, openapi_schema_as_dict):
@@ -474,7 +563,7 @@ def test_resource_openapi_info_included(app: Starlette, openapi_schema_as_dict):
         class Meta:
             type_ = 'test'
 
-    class TResourceInt(BaseResource):
+    class TResource(BaseResource):
         schema = TResourceSchema
         type_ = 'test'
 
@@ -486,11 +575,72 @@ def test_resource_openapi_info_included(app: Starlette, openapi_schema_as_dict):
             }
         }
 
-    TResourceInt.register_routes(app)
+    TResource.register_routes(app)
     schema = openapi_schema_as_dict(app)
     assert schema['paths']['/test/{id}']['get']['description'] == 'Test description from class'
+    assert validate_spec(app.schema_generator.spec) is True
 
 
-# test base resource openapi info is included
-# def test_base_resource_openapi_info_included(openapi_app: Starlette, openapi_schema_as_dict):
-#     assert False, 'ToDo'
+def test_required_attributes_and_relationships(app: Starlette, openapi_schema_as_dict):
+    class TResourceSchema(JSONAPISchema):
+        id = fields.String()
+        description = fields.String(required=True)
+
+        rel = JSONAPIRelationship(type_='test-other', required=True)
+
+        class Meta:
+            type_ = 'test'
+
+    class TResource(BaseResource):
+        schema = TResourceSchema
+        type_ = 'test'
+
+        @with_openapi_info(responses={'200': TResourceSchema})
+        async def get(self, id: Any, *args, **kwargs) -> Response:
+            pass
+
+    TResource.register_routes(app)
+    schema = openapi_schema_as_dict(app)
+
+    response_schema_name = TResource.schema.__name__.replace('Schema', '')
+    assert response_schema_name in schema['components']['schemas']
+    response_schema = schema['components']['schemas'][response_schema_name]
+    assert response_schema == {
+        'type': 'object',
+        'properties': {
+            'id': {'type': 'string'},
+            'type': {'type': 'string', 'enum': [TResource.type_]},
+            'attributes': {
+                'type': 'object',
+                'properties': {
+                    'description': {'type': 'string'},
+                },
+                'required': ['description']
+            },
+            'relationships': {
+                'type': 'object',
+                'properties': {
+                    'rel': {
+                        'type': 'object',
+                        'nullable': True,
+                        'properties': {
+                            'data': {
+                                'type': 'object',
+                                'properties': {
+                                    'id': {'type': 'string'},
+                                    'type': {
+                                        'type': 'string',
+                                        'enum': [TResource.schema.get_fields()['rel'].type_],
+                                    }
+                                },
+                            },
+                        }
+                    }
+                },
+                'required': ['rel']
+            }
+        },
+        'required': ['type', 'attributes', 'relationships'],
+    }
+
+    assert validate_spec(app.schema_generator.spec) is True
