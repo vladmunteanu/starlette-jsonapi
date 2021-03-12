@@ -1,7 +1,3 @@
-# test additional parameters passed to with_openapi_info
-# test parameters are extended instead of replaced
-# test relationship resource with many
-# test with_openapi_info overwrites values from class
 from collections import OrderedDict
 from typing import Any, List, Union, Dict, Type
 
@@ -578,6 +574,61 @@ def test_resource_openapi_info_included(app: Starlette, openapi_schema_as_dict):
     TResource.register_routes(app)
     schema = openapi_schema_as_dict(app)
     assert schema['paths']['/test/{id}']['get']['description'] == 'Test description from class'
+    assert validate_spec(app.schema_generator.spec) is True
+
+
+# test resource openapi info is replaced by with_openapi_info
+def test_resource_openapi_info_replaced(app: Starlette, openapi_schema_as_dict):
+    class TResourceSchema(JSONAPISchema):
+        id = fields.String()
+        description = fields.String()
+
+        class Meta:
+            type_ = 'test'
+
+    class TResource(BaseResource):
+        schema = TResourceSchema
+        type_ = 'test'
+
+        openapi_info = {
+            'handlers': {
+                'get': {
+                    'description': 'Test description from class'
+                }
+            }
+        }
+
+        @with_openapi_info(description='Test description from with_openapi_info')
+        async def get(self, id: Any, *args, **kwargs) -> Response:
+            pass
+
+    TResource.register_routes(app)
+    schema = openapi_schema_as_dict(app)
+    assert schema['paths']['/test/{id}']['get']['description'] == 'Test description from with_openapi_info'
+    assert validate_spec(app.schema_generator.spec) is True
+
+
+def test_openapi_info_parameters_for_endpoint(app: Starlette, openapi_schema_as_dict):
+    class TResourceSchema(JSONAPISchema):
+        id = fields.String()
+        description = fields.String()
+
+        class Meta:
+            type_ = 'test'
+
+    parameters = [{'name': 'filter[description]', 'in': 'query', 'schema': {'type': 'string'}}]
+
+    class TResource(BaseResource):
+        schema = TResourceSchema
+        type_ = 'test'
+
+        @with_openapi_info(parameters=parameters)
+        async def get(self, id: Any, *args, **kwargs) -> Response:
+            pass
+
+    TResource.register_routes(app)
+    schema = openapi_schema_as_dict(app)
+    assert schema['paths']['/test/{id}']['get']['parameters'] == parameters
     assert validate_spec(app.schema_generator.spec) is True
 
 
