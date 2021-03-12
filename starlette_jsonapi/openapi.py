@@ -1,11 +1,8 @@
 import functools
 import re
 from collections import OrderedDict
-from typing import List, Type, Union, NamedTuple, Dict, Any
+from typing import List, Type, Union, Dict, Any
 
-from starlette.routing import BaseRoute, iscoroutinefunction_or_partial, Route
-from starlette.schemas import BaseSchemaGenerator, EndpointInfo
-from starlette.convertors import CONVERTOR_TYPES
 from apispec import APISpec
 from apispec.ext.marshmallow import MarshmallowPlugin, OpenAPIConverter
 from marshmallow_jsonapi.schema import SchemaOpts
@@ -13,18 +10,14 @@ from marshmallow.utils import is_collection
 from marshmallow import fields as ma_fields
 from marshmallow import Schema, validate, class_registry
 from marshmallow.exceptions import RegistryError
+from starlette.routing import BaseRoute, iscoroutinefunction_or_partial, Route
+from starlette.schemas import BaseSchemaGenerator, EndpointInfo
+from starlette.convertors import CONVERTOR_TYPES
 
 from starlette_jsonapi.constants import OPENAPI_INFO, CONTENT_TYPE_HEADER
 from starlette_jsonapi.fields import JSONAPIRelationship
 from starlette_jsonapi.schema import JSONAPISchema
 from starlette_jsonapi.utils import safe_merge, isinstance_or_subclass
-
-
-class ExceptionSchemaInfo(NamedTuple):
-    name: str
-    status_code: Union[int, str]
-    detail: str
-    schema: dict
 
 
 SchemaType = Union[str, dict, JSONAPISchema, Type[JSONAPISchema]]
