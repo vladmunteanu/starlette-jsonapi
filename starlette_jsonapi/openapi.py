@@ -1,7 +1,7 @@
 import functools
 import re
 from collections import OrderedDict
-from typing import List, Type, Union, NamedTuple, Dict, Any, Callable
+from typing import List, Type, Union, NamedTuple, Dict, Any
 
 from starlette.routing import BaseRoute, iscoroutinefunction_or_partial, Route
 from starlette.schemas import BaseSchemaGenerator, EndpointInfo
@@ -48,13 +48,6 @@ def get_openapi_parameter_type(parameter_type: str) -> str:
         return 'number'
     else:
         return 'string'
-
-
-class EndpointInfoWithParameters(NamedTuple):
-    path: str
-    http_method: str
-    func: Callable
-    parameters: dict
 
 
 class JSONAPISchemaConverter(OpenAPIConverter):
