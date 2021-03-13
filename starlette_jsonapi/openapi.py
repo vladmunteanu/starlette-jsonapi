@@ -1,3 +1,30 @@
+"""
+Experimental support for generating OpenAPI 3.x specifications.
+
+Example:
+
+    .. code-block:: python
+
+        from starlette.applications import Starlette
+        from starlette_jsonapi.openapi import JSONAPISchemaGenerator, JSONAPIMarshmallowPlugin
+
+        schemas = JSONAPISchemaGenerator(
+            APISpec(
+                title='Example API',
+                version='1.0',
+                openapi_version='3.0.3',
+                info={'description': 'An example API.'},
+                plugins=[JSONAPIMarshmallowPlugin()],
+            )
+        )
+
+        app = Starlette()
+
+        # register resources routes on app
+
+        schema_dict = schemas.get_schema(app.routes)
+
+"""
 import functools
 import re
 from collections import OrderedDict
@@ -131,16 +158,18 @@ class JSONAPISchemaConverter(OpenAPIConverter):
 
 
 class JSONAPIMarshmallowPlugin(MarshmallowPlugin):
+    """ JSON:API Marshmallow plugin to handle JSONAPISchema subclasses. """
     Converter = JSONAPISchemaConverter
 
 
 class JSONAPISchemaGenerator(BaseSchemaGenerator):
+    """ OpenAPI schema generator for JSON:API resources. """
 
     def __init__(self, spec: APISpec):
         self.spec = spec
 
     def get_endpoints(self, routes: List[BaseRoute]) -> List[EndpointInfo]:
-        """ Temporarily override this to handle coroutines wrapped in functools.partial. """
+        """ Extends the base implementation to handle coroutines wrapped in functools.partial. """
         ret = super().get_endpoints(routes)
 
         for route in routes:
@@ -155,7 +184,14 @@ class JSONAPISchemaGenerator(BaseSchemaGenerator):
         return ret
 
     def get_schema(self, routes: List[BaseRoute]) -> dict:
-        """ Override to handle unwrapping actual handlers passed to handle_request. """
+        """
+        Registers routes and their OpenAPI information in the :class:`apispec.APISpec`.
+
+        Returns the OpenAPI specification for the given routes.
+
+        :param routes: List of registered routes
+        :return: dict representation of the OpenAPI specification
+        """
         # importing BaseResource and BaseRelationshipResource here to prevent circular imports
         from starlette_jsonapi.resource import BaseRelationshipResource, BaseResource
 
@@ -219,6 +255,13 @@ class JSONAPISchemaGenerator(BaseSchemaGenerator):
 
 
 def compute_base_openapi_info(klass: Type[Any]) -> dict:
+    """
+    Computes OpenAPI information for a resource class, traversing the MRO
+    to merge information from base classes.
+
+    :param klass: a BaseResource or BaseRelationshipResource subclass
+    :return: merged OpenAPI information
+    """
     from starlette_jsonapi.resource import BaseResource, BaseRelationshipResource
     openapi_info: dict = {}
     for base_klass in reversed(klass.__mro__):
@@ -229,6 +272,13 @@ def compute_base_openapi_info(klass: Type[Any]) -> dict:
 
 
 def process_responses(responses: dict) -> dict:
+    """
+    Processes response bodies, adding the OpenAPI representations for
+    any JSONAPISchema or Exception subclasses.
+
+    :param responses: Dictionary of HTTP status code -> response
+    :return: OpenAPI dictionary of responses
+    """
     computed_responses = {}
     for response_code, response in responses.items():
         if isinstance(response, dict):
@@ -248,8 +298,14 @@ def process_responses(responses: dict) -> dict:
 
 
 def process_request_body(request_body: SchemaType, method: str):
-    # Convert request body, correcting the OpenAPI representation
-    # based on the method name
+    """
+    Convert a request body to it's OpenAPI representation, correcting
+    the `id` attribute of the schema.
+
+    :param request_body: A schema for the request body which will be marked as required.
+    :param method: The HTTP method, usually one of: 'patch', 'post'
+    :return: The OpenAPI representation for the given schema
+    """
     if (
         not isinstance(request_body, (str, dict))
         and isinstance_or_subclass(request_body, JSONAPISchema)
@@ -264,6 +320,48 @@ def with_openapi_info(
         include_in_schema: bool = True,
         *args, **kwargs,
 ):
+    """
+    Decorates a handler to add OpenAPI information that will be merged (deep update)
+    into the resource class information, overwriting common keys.
+    Additional ``kwargs`` are included too, and the final dictionary will be used as
+    the operation's options.
+
+    Multiple ``with_openapi_info`` decorators can be used on the same handler.
+
+    Examples:
+
+    .. code-block:: python
+
+        class ExampleResource(BaseResource):
+            schema = ExampleSchema
+            type_ = 'examples'
+
+            @with_openapi_info(responses={'200': ExampleSchema, '404': ResourceNotFound})
+            async def get(self, id: Any, *args, **kwargs) -> Response:
+                # A 200 response body will be formed from ExampleSchema.
+                # A 404 response body will be formed from the ResourceNotFound exception.
+
+            @with_openapi_info(request_body=ExampleSchema)
+            @with_openapi_info(summary='Updating an example')
+            async def patch(self, id: Any, *args, **kwargs) -> Response:
+                # A requestBody schema will be formed from ExampleSchema.
+                # Summary for the path will be added as well.
+
+            @with_openapi_info(include_in_schema=False)
+            async def delete(self, id: Any, *args, **kwargs) -> Response:
+                # Will not be registered in the OpenAPI specification.
+
+            @with_openapi_info(responses={'200': ExampleSchema(many=True)})
+            async def get_many(self, *args, **kwargs) -> Response:
+                # A 200 response body will be formed from ExampleSchema, for a list of items.
+
+    :param request_body: optional, a request body which will be required
+    :param responses: optional, a dictionary of HTTP status code -> response schema
+    :param include_in_schema: Flag to control whether the handler is included in the OpenAPI spec
+    :param args: Additional arguments, currently ignored
+    :param kwargs: Additional keyword arguments, included in the operation's options
+    :return: The decorated handler
+    """
     def update_openapi_info(func):
         nonlocal request_body
 
@@ -274,13 +372,12 @@ def with_openapi_info(
         new_info = {'include_in_schema': include_in_schema, 'responses': {}}  # type: dict
         new_info.update(kwargs)
 
-        # convert responses, add correct OpenAPI representations
+        # Convert responses, add correct OpenAPI representations
         if responses:
             computed_responses = process_responses(responses=responses)
             new_info['responses'] = computed_responses
 
-        # Convert request body, correcting the OpenAPI representation
-        # based on the handler name
+        # Convert request body, correcting the OpenAPI representation based on the handler name
         if request_body:
             new_info['requestBody'] = process_request_body(request_body=request_body, method=func.__name__)
 
@@ -292,6 +389,7 @@ def with_openapi_info(
 
 
 def response_for_schema(schema: SchemaType) -> dict:
+    """ Generates a response schema. """
     return {'content': {CONTENT_TYPE_HEADER: {'schema': schema}}, 'description': 'Example response'}
 
 
@@ -299,6 +397,7 @@ def response_for_exception(
         exception: Union[Exception, Type[Exception]],
         status_code: str,
 ) -> dict:
+    """ Generates an exception schema. """
     detail_message = getattr(exception, 'detail', 'Internal server error')
     status_code = str(getattr(exception, 'status_code', status_code or 500))
     exc_name = exception.__class__.__name__ if isinstance(exception, Exception) else exception.__name__
@@ -329,6 +428,30 @@ def response_for_exception(
 
 
 def response_for_relationship(schema: Union[JSONAPISchema, Type[JSONAPISchema]], relationship_name: str) -> dict:
+    """
+    Generates a relationship response schema.
+
+    Examples:
+
+    .. code-block:: python
+
+        class ExampleRelationshipResource(BaseRelationshipResource):
+            parent_resource = ExampleResource
+            relationship_name = 'rel'
+
+            @with_openapi_info(
+                responses={
+                    '200': response_for_relationship(ExampleResource.schema, relationship_name)
+                }
+            )
+            async def get(self, parent_id: Any, *args, **kwargs) -> Response:
+                # A 200 response body will be formed from the relationship
+                # defined on parent resource schema.
+
+    :param schema: the JSONAPISchema of the parent resource
+    :param relationship_name: the name of the relationship, as defined on the parent resource schema
+    :return: The OpenAPI representation of the response
+    """
     rel_field = schema.get_fields()[relationship_name]
     if not isinstance(rel_field, JSONAPIRelationship):
         raise ValueError(f'{relationship_name} is not a relationship of {schema}')
@@ -351,10 +474,57 @@ def response_for_relationship(schema: Union[JSONAPISchema, Type[JSONAPISchema]],
     }
 
 
+def request_for_relationship(schema: Union[JSONAPISchema, Type[JSONAPISchema]], relationship_name: str) -> dict:
+    """
+    Generates a relationship request schema.
+
+    Examples:
+
+    .. code-block:: python
+
+        class ExampleRelationshipResource(BaseRelationshipResource):
+            parent_resource = ExampleResource
+            relationship_name = 'rel'
+
+            @with_openapi_info(
+                request_body=request_for_relationship(ExampleResource.schema, relationship_name)
+            )
+            async def post(self, parent_id: Any, *args, **kwargs) -> Response:
+                # A request body will be formed from the relationship
+                # defined on parent resource schema and marked as required.
+
+    :param schema: the JSONAPISchema of the parent resource
+    :param relationship_name: the name of the relationship, as defined on the parent resource schema
+    :return: The OpenAPI representation of the request
+    """
+    rel_field = schema.get_fields()[relationship_name]
+    if not isinstance(rel_field, JSONAPIRelationship):
+        raise ValueError(f'{relationship_name} is not a relationship of {schema}')
+    rel_item_schema = {
+        'type': 'object',
+        'properties': {
+            'id': {'type': 'string'},
+            'type': {'type': 'string', 'enum': [rel_field.type_]},
+        }
+    }
+    if getattr(rel_field, 'many', False):
+        rel_item_schema = {'type': 'array', 'items': rel_item_schema}
+    else:
+        rel_item_schema = rel_item_schema
+    return {
+        'content': {
+            CONTENT_TYPE_HEADER: {'schema': {'type': 'object', 'properties': {'data': rel_item_schema}}}
+        },
+        'description': 'Example relationship request',
+        'required': True,
+    }
+
+
 def request_for_schema(
         schema: SchemaType,
         method: str = 'post',
 ) -> dict:
+    """ Generates a request schema. """
     if not isinstance(schema, (str, dict)):
         schema_cls = schema  # type: Any
         if isinstance(schema, JSONAPISchema):

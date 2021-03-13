@@ -16,7 +16,7 @@ from starlette_jsonapi.schema import JSONAPISchema
 from starlette_jsonapi.meta import registered_resources
 from starlette_jsonapi.openapi import (
     JSONAPISchemaGenerator, JSONAPIMarshmallowPlugin,
-    with_openapi_info, response_for_relationship,
+    with_openapi_info, response_for_relationship, request_for_relationship,
 )
 
 
@@ -695,3 +695,155 @@ def test_required_attributes_and_relationships(app: Starlette, openapi_schema_as
     }
 
     assert validate_spec(app.schema_generator.spec) is True
+
+
+def test_multiple_with_openapi_info(app: Starlette, openapi_schema_as_dict):
+    class TResourceSchema(JSONAPISchema):
+        id = fields.String()
+        description = fields.String()
+
+        class Meta:
+            type_ = 'test'
+
+    class TResource(BaseResource):
+        schema = TResourceSchema
+        type_ = 'test'
+
+        @with_openapi_info(description='test second decorator')
+        @with_openapi_info(summary='test first decorator')
+        async def get(self, id: Any, *args, **kwargs) -> Response:
+            pass
+
+    TResource.register_routes(app)
+    schema = openapi_schema_as_dict(app)
+    assert schema['paths']['/test/{id}']['get']['description'] == 'test second decorator'
+    assert schema['paths']['/test/{id}']['get']['summary'] == 'test first decorator'
+    assert validate_spec(app.schema_generator.spec) is True
+
+
+def test_request_for_relationships(openapi_resources, openapi_app: Starlette, openapi_schema_as_dict):
+    TChildResourceRel = openapi_resources['TChildResourceRel']
+    TChildResourceRel.patch = with_openapi_info(
+        request_body=request_for_relationship(
+            TChildResourceRel.parent_resource.schema,
+            TChildResourceRel.relationship_name
+        )
+    )(TChildResourceRel.patch)
+    schema = openapi_schema_as_dict(openapi_app)
+    relationships_url = ''.join(
+        [
+            '/', TChildResourceRel.parent_resource.type_,
+            '/{parent_id}/relationships/', TChildResourceRel.relationship_name
+        ]
+    )
+    assert relationships_url in schema['paths']
+    rel_field = TChildResourceRel.parent_resource.schema.get_fields()[TChildResourceRel.relationship_name]
+    assert isinstance(rel_field, JSONAPIRelationship)
+    assert schema['paths'][relationships_url]['patch']['requestBody']['content'][CONTENT_TYPE_HEADER] == {
+        'schema': {
+            'type': 'object',
+            'properties': {
+                'data': {
+                    'type': 'object',
+                    'properties': {
+                        'id': {'type': 'string'},
+                        'type': {'type': 'string', 'enum': [rel_field.type_]},
+                    }
+                }
+            }
+        }
+    }
+    assert schema['paths'][relationships_url]['patch']['requestBody']['required'] is True
+    assert validate_spec(openapi_app.schema_generator.spec) is True
+
+
+def test_request_for_relationships_many(app: Starlette, openapi_schema_as_dict):
+    class TResourceSchema(JSONAPISchema):
+        id = fields.String()
+        name = fields.String()
+
+        class Meta:
+            type_ = 'test'
+
+    class TResource(BaseResource):
+        schema = TResourceSchema
+        type_ = 'test'
+
+    class TRelatedResourceSchema(JSONAPISchema):
+        id = fields.String()
+        description = fields.String()
+
+        rel = JSONAPIRelationship(
+            type_=TResource.type_,
+            schema=TResourceSchema,
+            many=True,
+            related_resource=TResource,
+        )
+
+        class Meta:
+            type_ = 'test-related'
+
+    class TResourceRelated(BaseResource):
+        schema = TRelatedResourceSchema
+        type_ = 'test-related'
+
+    class TResourceRelationship(BaseRelationshipResource):
+        parent_resource = TResourceRelated
+        relationship_name = 'rel'
+
+        @with_openapi_info(
+            request_body=request_for_relationship(
+                TResourceRelated.schema(many=True),
+                relationship_name,
+            )
+        )
+        async def patch(self, parent_id: Any, *args, **kwargs) -> Response:
+            pass
+
+    TResource.register_routes(app)
+    TResourceRelated.register_routes(app)
+    TResourceRelationship.register_routes(app)
+
+    schema = openapi_schema_as_dict(app)
+    relationships_url = ''.join(
+        [
+            '/', TResourceRelationship.parent_resource.type_,
+            '/{parent_id}/relationships/', TResourceRelationship.relationship_name
+        ]
+    )
+    assert relationships_url in schema['paths']
+    rel_field = TResourceRelationship.parent_resource.schema.get_fields()[TResourceRelationship.relationship_name]
+    assert isinstance(rel_field, JSONAPIRelationship)
+    assert schema['paths'][relationships_url]['patch']['requestBody']['content'][CONTENT_TYPE_HEADER] == {
+        'schema': {
+            'type': 'object',
+            'properties': {
+                'data': {
+                    'type': 'array',
+                    'items': {
+                        'type': 'object',
+                        'properties': {
+                            'id': {'type': 'string'},
+                            'type': {'type': 'string', 'enum': [rel_field.type_]},
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert validate_spec(app.schema_generator.spec) is True
+
+
+def test_request_for_relationships_invalid_field(app: Starlette):
+    class TResourceSchema(JSONAPISchema):
+        id = fields.String()
+        name = fields.String()
+
+        class Meta:
+            type_ = 'test'
+
+    with pytest.raises(ValueError):
+        request_for_relationship(TResourceSchema, 'name')
+
+    with pytest.raises(KeyError):
+        request_for_relationship(TResourceSchema, 'unknown')
