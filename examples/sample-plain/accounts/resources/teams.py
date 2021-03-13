@@ -6,6 +6,10 @@ from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
 from starlette_jsonapi.fields import JSONAPIRelationship
+from starlette_jsonapi.openapi import (
+    with_openapi_info, response_for_schema,
+    response_for_relationship, request_for_relationship,
+)
 from starlette_jsonapi.resource import BaseResource, BaseRelationshipResource
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
@@ -52,6 +56,12 @@ class TeamsResource(BaseResource):
         """
         return None
 
+    @with_openapi_info(
+        responses={
+            '200': TeamSchema,
+            '404': TeamNotFound,
+        },
+    )
     async def get(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise TeamNotFound
@@ -61,6 +71,12 @@ class TeamsResource(BaseResource):
 
         return await self.to_response(await self.serialize(data=team))
 
+    @with_openapi_info(
+        responses={
+            '200': TeamSchema,
+            '404': TeamNotFound,
+        },
+    )
     async def patch(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise TeamNotFound
@@ -87,6 +103,12 @@ class TeamsResource(BaseResource):
 
         return await self.to_response(await self.serialize(data=team))
 
+    @with_openapi_info(
+        responses={
+            '204': {'description': 'The resource was deleted successfully.'},
+            '404': TeamNotFound,
+        },
+    )
     async def delete(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise TeamNotFound
@@ -98,10 +120,16 @@ class TeamsResource(BaseResource):
 
         return JSONAPIResponse(status_code=204)
 
+    @with_openapi_info(
+        responses={'200': TeamSchema(many=True)},
+    )
     async def get_many(self, *args, **kwargs) -> Response:
         teams = Team.get_items()
         return await self.to_response(await self.serialize(data=teams, many=True))
 
+    @with_openapi_info(
+        responses={'201': TeamSchema},
+    )
     async def post(self, *args, **kwargs) -> Response:
         json_body = await self.deserialize_body()
 
@@ -124,6 +152,12 @@ class TeamsResource(BaseResource):
         result = await self.serialize(data=team)
         return await self.to_response(result, status_code=201)
 
+    @with_openapi_info(
+        responses={
+            '200': 'UserSchema',
+            '404': TeamNotFound,
+        },
+    )
     async def get_related(self, id: Any, relationship: str, related_id: Any = None, *args, **kwargs) -> Response:
         team = Team.get_item(id)
         if not team:
@@ -142,12 +176,19 @@ class TeamUsersResource(BaseRelationshipResource):
     parent_resource = TeamsResource
     relationship_name = 'users'
 
+    @with_openapi_info(
+        responses={'200': response_for_relationship(parent_resource.schema, relationship_name)},
+    )
     async def get(self, parent_id: str, *args, **kwargs) -> Response:
         team = Team.get_item(int(parent_id))
         if not team:
             raise TeamNotFound
         return await self.to_response(await self.serialize(data=team))
 
+    @with_openapi_info(
+        responses={'200': response_for_relationship(parent_resource.schema, relationship_name)},
+        request_body=request_for_relationship(parent_resource.schema, relationship_name),
+    )
     async def patch(self, parent_id: str, *args, **kwargs) -> Response:
         team = Team.get_item(int(parent_id))
         if not team:
@@ -167,6 +208,10 @@ class TeamUsersResource(BaseRelationshipResource):
         team.save()
         return await self.to_response(await self.serialize(data=team))
 
+    @with_openapi_info(
+        responses={'200': response_for_relationship(parent_resource.schema, relationship_name)},
+        request_body=request_for_relationship(parent_resource.schema, relationship_name),
+    )
     async def post(self, parent_id: str, *args, **kwargs) -> Response:
         team = Team.get_item(int(parent_id))
         if not team:
@@ -186,6 +231,10 @@ class TeamUsersResource(BaseRelationshipResource):
         team.save()
         return await self.to_response(await self.serialize(data=team))
 
+    @with_openapi_info(
+        responses={'200': response_for_relationship(parent_resource.schema, relationship_name)},
+        request_body=request_for_relationship(parent_resource.schema, relationship_name),
+    )
     async def delete(self, parent_id: str, *args, **kwargs) -> Response:
         team = Team.get_item(int(parent_id))
         if not team:
