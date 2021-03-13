@@ -3,7 +3,7 @@ OpenAPI
 OpenAPI schema generation, based on `apispec`_.
 Please check the `sample-plain`_ example for an actual implementation.
 
-.. note:: Please note this is an `experimental` integration and it's functionality can change without notice.
+.. note:: Please note this is an `experimental` integration and its functionality can change without notice.
 
 For the rest of this document, we will use the resources implemented in the Tutorial section.
 
