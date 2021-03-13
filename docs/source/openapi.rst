@@ -57,7 +57,7 @@ Example:
         type_ = 'articles'
         schema = ArticleSchema
 
-        @with_openapi_info(responses={'200': ArticleSchema, '404': })
+        @with_openapi_info(responses={'200': ArticleSchema, '404': ResourceNotFound})
         async def get(self, id: Any, *args, **kwargs) -> Response:
             ...
 
