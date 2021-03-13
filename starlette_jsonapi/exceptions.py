@@ -42,11 +42,12 @@ class JSONAPIException(HTTPException):
 
 class ResourceNotFound(JSONAPIException):
     """ HTTP 404 error, serialized according to json:api. """
+    status_code: int = 404
     detail: str = 'Resource object not found.'
 
-    def __init__(self, status_code: int = 404, detail: str = None) -> None:
+    def __init__(self, status_code: int = None, detail: str = None) -> None:
         super().__init__(
-            status_code,
+            status_code if status_code is not None else self.status_code,
             detail=detail if detail is not None else self.detail,
             errors=None,
         )

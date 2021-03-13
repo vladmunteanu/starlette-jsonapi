@@ -7,7 +7,7 @@ from starlette_jsonapi.exceptions import JSONAPIException
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.utils import (
     serialize_error, register_jsonapi_exception_handlers, filter_sparse_fields,
-    process_sparse_fields,
+    process_sparse_fields, safe_merge, isinstance_or_subclass,
 )
 
 
@@ -288,3 +288,31 @@ def test_process_sparse_fields_without_fields():
 
     assert process_sparse_fields(complete_jsonapi_repr, many=False) == complete_jsonapi_repr
     assert process_sparse_fields(complete_jsonapi_repr, many=False, sparse_fields={}) == complete_jsonapi_repr
+
+
+def test_safe_merge():
+    first: dict = {'a': 'abc'}
+    second: dict = {'a': 'abc'}
+    assert safe_merge(first, second) == {'a': 'abc'}
+
+    first = {'a': ['abc']}
+    second = {'a': 'abc'}
+    assert safe_merge(first, second) == {'a': 'abc'}
+
+    first = {'a': ['abc']}
+    second = {'a': ['abc']}
+    assert safe_merge(first, second) == {'a': ['abc', 'abc']}
+
+    first = {'a': 'abc'}
+    second = {'b': 'abc'}
+    assert safe_merge(first, second) == {'a': 'abc', 'b': 'abc'}
+
+    first = {'a': 'abc', 'b': {'c': 'abc'}}
+    second = {'a': 'abc', 'b': {'d': 'def'}}
+    assert safe_merge(first, second) == {'a': 'abc', 'b': {'c': 'abc', 'd': 'def'}}
+
+
+def test_isinstace_or_subclass():
+    assert isinstance_or_subclass('abc', Exception) is False
+    assert isinstance_or_subclass(Exception, Exception) is True
+    assert isinstance_or_subclass(Exception('abc'), Exception) is True

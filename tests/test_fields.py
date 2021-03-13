@@ -95,7 +95,7 @@ def test_jsonapi_relationship_routes(app: Starlette):
         schema = FooSchema
 
     FooResource.register_routes(app, '/')
-    assert len(FooResource.mount.routes) == 7  # 5 from the resource + 2 related
+    assert len(FooResource.mount.routes) == 6  # 5 from the resource + 1 related
 
     d = FooSchema(app=app).dump(dict(rel=dict(id='bar'), rel_id='bar', id='foo_id'))
     assert d['data']['relationships'] == {

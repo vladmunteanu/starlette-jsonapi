@@ -1,3 +1,4 @@
+import copy
 from typing import Optional, Set, Dict, List, Union
 
 from starlette.applications import Starlette
@@ -178,3 +179,43 @@ def prefix_url_path(app: Starlette, path: str, **kwargs):
     """
     prefix = getattr(app, 'url_prefix', '')
     return f'{prefix}{app.url_path_for(path, **kwargs)}'
+
+
+def safe_merge(first: Union[dict, list], second: Union[dict, list]):
+    """ Safe merge two dictionaries, returning a deepcopy of `first` with `second` merged into it. """
+    safe_first = copy.deepcopy(first)
+    return merge(safe_first, second)
+
+
+def merge(a, b, path=None):
+    """
+    Merges b into a,
+    mainly: https://stackoverflow.com/questions/7204805/how-to-merge-dictionaries-of-dictionaries/7205107#7205107
+
+    """
+    path = [] if path is None else path
+    for key in b:
+        if key in a:
+            if isinstance(a[key], list) and isinstance(b[key], list):
+                a[key].extend(b[key])
+            elif isinstance(a[key], dict) and isinstance(b[key], dict):
+                merge(a[key], b[key], path + [str(key)])
+            elif a[key] == b[key]:
+                pass  # same leaf value
+            else:
+                a[key] = b[key]
+        else:
+            a[key] = b[key]
+    return a
+
+
+def isinstance_or_subclass(inst, cls):
+    """ Utility for safely checking isinstance and issubclass. """
+    if isinstance(inst, cls):
+        return True
+    try:
+        if issubclass(inst, cls):
+            return True
+    except TypeError:
+        pass
+    return False

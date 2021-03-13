@@ -46,4 +46,5 @@ Todo
    getting_started
    tutorial
    how_to
+   openapi
    API Reference <api_reference/modules>

@@ -11,4 +11,5 @@ starlette_jsonapi
    starlette_jsonapi.resource
    starlette_jsonapi.responses
    starlette_jsonapi.schema
+   starlette_jsonapi.openapi
    starlette_jsonapi.utils

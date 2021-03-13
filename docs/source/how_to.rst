@@ -122,3 +122,42 @@ Versioning can be implemented by specifying ``register_as`` on the resource clas
     # both resources are now accessible without conflicts:
     assert app.url_path_for('v1-examples:get_many') == '/v1/examples/'
     assert app.url_path_for('v2-examples:get_many') == '/v2/examples/'
+
+Generate OpenAPI spec
+---------------------
+Although ``starlette-jsonapi`` does not include the Swagger UI files,
+a JSON of the OpenAPI representation can be generated and then passed to a Swagger UI docker container.
+
+Example:
+
+.. code-block:: python
+
+    from apispec import APISpec
+    from starlette.applications import Starlette
+    from starlette_jsonapi.openapi import JSONAPISchemaGenerator, JSONAPIMarshmallowPlugin
+
+    schemas = JSONAPISchemaGenerator(
+        APISpec(
+            title='Example API',
+            version='1.0',
+            openapi_version='3.0.3',
+            info={'description': 'An example API.'},
+            plugins=[JSONAPIMarshmallowPlugin()],
+        )
+    )
+
+    app = Starlette()
+
+    # register resources routes on app
+    # ...
+
+    schema_dict = schemas.get_schema(app.routes)
+    with open('data/schema.json', 'w') as f:
+        f.write(json.dumps(schema_dict, indent=4))
+
+Once generated, the schema can be mounted inside a docker container for the Swagger UI:
+
+.. code-block::
+
+    docker pull swaggerapi/swagger-ui
+    docker run -p 8080:8080 -e SWAGGER_JSON=/foo/schema.json -v data:/foo swaggerapi/swagger-ui

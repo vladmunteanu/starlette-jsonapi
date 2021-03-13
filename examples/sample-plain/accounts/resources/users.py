@@ -6,6 +6,7 @@ from starlette.exceptions import HTTPException
 from starlette.responses import Response
 
 from starlette_jsonapi.fields import JSONAPIRelationship
+from starlette_jsonapi.openapi import with_openapi_info, response_for_schema
 from starlette_jsonapi.resource import BaseResource
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
@@ -41,6 +42,17 @@ class UsersResource(BaseResource):
     schema = UserSchema
     id_mask = 'int'
 
+    openapi_info = {
+        'handlers': {
+            'get': {
+                'description': 'Retrieve an user by id.'
+            },
+            'get_related': {
+                'description': 'Retrieve a related organization.'
+            }
+        }
+    }
+
     async def include_relations(self, obj: User, relations: List[str]):
         """
         We override this to allow `included` requests against this resource,
@@ -49,6 +61,7 @@ class UsersResource(BaseResource):
         """
         return None
 
+    @with_openapi_info(responses={'200': UserSchema, '404': UserNotFound})
     async def get(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise UserNotFound
@@ -58,6 +71,13 @@ class UsersResource(BaseResource):
 
         return await self.to_response(await self.serialize(data=user))
 
+    @with_openapi_info(
+        responses={
+            '200': UserSchema,
+            '404': UserNotFound,
+        },
+        request_body=UserSchema,
+    )
     async def patch(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise UserNotFound
@@ -81,6 +101,12 @@ class UsersResource(BaseResource):
 
         return await self.to_response(await self.serialize(data=user))
 
+    @with_openapi_info(
+        responses={
+            '204': {'description': 'The resource was deleted successfully.'},
+            '404': UserNotFound,
+        },
+    )
     async def delete(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise UserNotFound
@@ -92,10 +118,18 @@ class UsersResource(BaseResource):
 
         return JSONAPIResponse(status_code=204)
 
+    @with_openapi_info(
+        responses={'200': UserSchema(many=True)}
+    )
     async def get_many(self, *args, **kwargs) -> Response:
         users = User.get_items()
         return await self.to_response(await self.serialize(data=users, many=True))
 
+    @with_openapi_info(
+        responses={'201': UserSchema},
+        request_body=UserSchema,
+        summary='Create a new account',
+    )
     async def post(self, *args, **kwargs) -> Response:
         json_body = await self.deserialize_body()
 
@@ -117,6 +151,9 @@ class UsersResource(BaseResource):
         result = await self.serialize(data=user)
         return await self.to_response(result, status_code=201)
 
+    @with_openapi_info(
+        responses={'200': response_for_schema('OrganizationSchema')},
+    )
     async def get_related(self, id: Any, relationship: str, related_id: Any = None, *args, **kwargs) -> Response:
         user = User.get_item(id)
         if not user:

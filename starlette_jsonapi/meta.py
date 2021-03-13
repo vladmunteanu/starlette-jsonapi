@@ -1,6 +1,7 @@
+from typing import Any, Type, Dict
 
 # map of resource class name to class
-registered_resources = {}
+registered_resources = {}  # type: Dict[str, Type[Any]]
 
 
 class RegisteredResourceMeta(type):

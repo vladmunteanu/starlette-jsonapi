@@ -1,6 +1,7 @@
 from marshmallow_jsonapi import fields
 from starlette.responses import Response
 
+from starlette_jsonapi.openapi import with_openapi_info
 from starlette_jsonapi.resource import BaseResource
 from starlette_jsonapi.responses import JSONAPIResponse
 from starlette_jsonapi.schema import JSONAPISchema
@@ -29,6 +30,12 @@ class OrganizationsResource(BaseResource):
     id_mask = 'int'
     pagination_class = PageNumberPagination
 
+    @with_openapi_info(
+        responses={
+            '200': 'OrganizationSchema',
+            '404': OrganizationNotFound,
+        },
+    )
     async def get(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise OrganizationNotFound
@@ -38,6 +45,13 @@ class OrganizationsResource(BaseResource):
 
         return await self.to_response(await self.serialize(data=organization))
 
+    @with_openapi_info(
+        responses={
+            '200': 'OrganizationSchema',
+            '404': OrganizationNotFound,
+        },
+        request_body=OrganizationSchema,
+    )
     async def patch(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise OrganizationNotFound
@@ -60,6 +74,13 @@ class OrganizationsResource(BaseResource):
 
         return await self.to_response(await self.serialize(data=organization))
 
+    @with_openapi_info(
+        responses={
+            '204': {'description': 'The resource was deleted successfully.'},
+            '404': OrganizationNotFound,
+        },
+        request_body=OrganizationSchema,
+    )
     async def delete(self, id=None, *args, **kwargs) -> Response:
         if not id:
             raise OrganizationNotFound
@@ -71,10 +92,16 @@ class OrganizationsResource(BaseResource):
 
         return JSONAPIResponse(status_code=204)
 
+    @with_openapi_info(
+        responses={'200': OrganizationSchema(many=True)},
+    )
     async def get_many(self, *args, **kwargs) -> Response:
         organizations = Organization.get_items()
         return await self.to_response(await self.serialize(data=organizations, many=True, paginate=True))
 
+    @with_openapi_info(
+        responses={'201': 'OrganizationSchema'},
+    )
     async def post(self, *args, **kwargs) -> Response:
         json_body = await self.deserialize_body()
         organization = Organization()
