@@ -793,7 +793,7 @@ def test_request_for_relationships_many(app: Starlette, openapi_schema_as_dict):
 
         @with_openapi_info(
             request_body=request_for_relationship(
-                TResourceRelated.schema(many=True),
+                TResourceRelated.schema,
                 relationship_name,
             )
         )
