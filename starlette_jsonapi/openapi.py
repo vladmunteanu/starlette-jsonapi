@@ -5,6 +5,7 @@ Example:
 
     .. code-block:: python
 
+        from apispec import APISpec
         from starlette.applications import Starlette
         from starlette_jsonapi.openapi import JSONAPISchemaGenerator, JSONAPIMarshmallowPlugin
 
