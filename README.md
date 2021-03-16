@@ -26,6 +26,7 @@ Since this project is under development, please pin your dependencies to avoid p
 - support for client generated IDs
 - support top level meta objects
 - [pagination helpers](https://jsonapi.org/format/#fetching-pagination)
+- OpenAPI 3.x (f.k.a Swagger) integration
 
 ### Todo:
 - [sorting helpers](https://jsonapi.org/format/#fetching-sorting)

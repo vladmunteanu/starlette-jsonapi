@@ -25,6 +25,7 @@ Features
 - support for client generated IDs
 - support top level meta objects
 - `pagination helpers <https://jsonapi.org/format/#fetching-pagination>`_
+- OpenAPI 3.x (f.k.a Swagger) integration
 
 Todo
 ----
