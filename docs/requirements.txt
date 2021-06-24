@@ -38,13 +38,13 @@ pyparsing==2.4.7
     # via packaging
 pytz==2020.1
     # via babel
-requests==2.24.0
+requests==2.25.1
     # via sphinx
 six==1.15.0
     # via packaging
 snowballstemmer==2.0.0
     # via sphinx
-sphinx==3.2.1
+sphinx==4.0.2
     # via
     #   -r requirements.in
     #   sphinx-rtd-theme
@@ -64,7 +64,7 @@ sphinxcontrib-serializinghtml==1.1.4
     # via sphinx
 starlette==0.14.2
     # via -r requirements.in
-urllib3==1.25.11
+urllib3==1.26.5
     # via requests
 
 # The following packages are considered to be unsafe in a requirements file:
