@@ -26,7 +26,9 @@ setup(
     include_package_data=True,
     install_requires=[
         'starlette>=0.14.2',
-        'apispec>4'
+        'apispec>4',
+        'marshmallow>=3',
+        'marshmallow-jsonapi>=0.24.0',
     ],
     license='MIT License',
     url='https://github.com/vladmunteanu/starlette-jsonapi',

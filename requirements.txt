@@ -62,7 +62,7 @@ marshmallow==3.6.1
     # via
     #   -r requirements.in
     #   marshmallow-jsonapi
-marshmallow-jsonapi==0.23.1
+marshmallow-jsonapi==0.24.0
     # via -r requirements.in
 more-itertools==8.4.0
     # via pytest
