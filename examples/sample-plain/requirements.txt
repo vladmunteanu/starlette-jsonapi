@@ -4,27 +4,49 @@
 #
 #    pip-compile --output-file=requirements.txt requirements.in
 #
-apispec==4.3.0
+anyio==3.2.1
+    # via starlette
+apispec==4.7.0
     # via starlette-jsonapi
-asgiref==3.3.4
+asgiref==3.4.1
     # via uvicorn
-click==7.1.2
+async-generator==1.10
+    # via anyio
+click==8.0.1
     # via uvicorn
-h11==0.9.0
+contextvars==2.4
+    # via sniffio
+dataclasses==0.8
+    # via anyio
+h11==0.12.0
     # via uvicorn
-marshmallow==3.7.1
+idna==3.2
+    # via anyio
+immutables==0.15
+    # via contextvars
+importlib-metadata==4.6.1
+    # via click
+marshmallow==3.12.1
     # via
-    #   -r requirements.in
     #   marshmallow-jsonapi
-marshmallow-jsonapi==0.23.2
-    # via -r requirements.in
-starlette==0.14.2
+    #   starlette-jsonapi
+marshmallow-jsonapi==0.24.0
+    # via starlette-jsonapi
+sniffio==1.2.0
+    # via anyio
+starlette==0.15.0
     # via
     #   -r requirements.in
     #   starlette-jsonapi
-starlette-jsonapi==2.1.0
+starlette-jsonapi==2.2.0
     # via -r requirements.in
 typing-extensions==3.10.0.0
-    # via uvicorn
+    # via
+    #   anyio
+    #   asgiref
+    #   importlib-metadata
+    #   uvicorn
 uvicorn==0.14.0
     # via -r requirements.in
+zipp==3.5.0
+    # via importlib-metadata

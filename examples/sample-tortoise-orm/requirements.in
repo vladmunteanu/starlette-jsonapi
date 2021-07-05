@@ -1,7 +1,5 @@
 uvicorn
 starlette
 tortoise-orm
-marshmallow
-marshmallow-jsonapi
 
 starlette-jsonapi

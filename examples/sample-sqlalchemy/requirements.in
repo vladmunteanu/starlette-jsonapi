@@ -1,7 +1,5 @@
 uvicorn
 starlette
-marshmallow
-marshmallow_jsonapi
 sqlalchemy
 
 starlette-jsonapi

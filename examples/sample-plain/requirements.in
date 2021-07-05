@@ -1,6 +1,4 @@
 uvicorn
 starlette
-marshmallow
-marshmallow_jsonapi
 
 starlette-jsonapi
