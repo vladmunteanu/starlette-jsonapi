@@ -7,7 +7,6 @@ apispec[validation]
 pyyaml
 
 # testing dependencies
-tox
 pytest
 pytest-asyncio
 pytest-cov
