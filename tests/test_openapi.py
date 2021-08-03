@@ -656,6 +656,8 @@ def test_required_attributes_and_relationships(app: Starlette, openapi_schema_as
     response_schema_name = TResource.schema.__name__.replace('Schema', '')
     assert response_schema_name in schema['components']['schemas']
     response_schema = schema['components']['schemas'][response_schema_name]
+    relationship_field = TResource.schema.get_fields()['rel']
+    assert isinstance(relationship_field, JSONAPIRelationship)
     assert response_schema == {
         'type': 'object',
         'properties': {
@@ -681,7 +683,7 @@ def test_required_attributes_and_relationships(app: Starlette, openapi_schema_as
                                     'id': {'type': 'string'},
                                     'type': {
                                         'type': 'string',
-                                        'enum': [TResource.schema.get_fields()['rel'].type_],
+                                        'enum': [relationship_field.type_],
                                     }
                                 },
                             },
