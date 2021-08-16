@@ -146,7 +146,7 @@ class _BaseResourceHandler:
                 response = await cls.handle_error(request, request_context, exc=after_request_exc)
 
         return response
-    
+
     @classmethod
     async def execute_handler(
         cls, request: Request, request_context: dict, handler_name: str,
@@ -163,7 +163,7 @@ class _BaseResourceHandler:
         handler = getattr(resource, handler_name, None)
         response = await handler(*args, **kwargs)
         return response
-        
+
     def process_sparse_fields_request(self, serialized_data: dict, many: bool = False) -> dict:
         """
         Processes sparse fields requests by calling
