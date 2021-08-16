@@ -135,9 +135,7 @@ class _BaseResourceHandler:
             try:
                 if request.method not in cls.allowed_methods:
                     raise JSONAPIException(status_code=405)
-                resource = cls(request, request_context, *args, **kwargs)
-                handler = getattr(resource, handler_name, None)
-                response = await handler(*args, **kwargs)
+                response = await cls.execute_handler(request, request_context, handler_name, *args, **kwargs)
             except Exception as e:
                 response = await cls.handle_error(request, request_context, exc=e)
 
@@ -147,6 +145,23 @@ class _BaseResourceHandler:
             except Exception as after_request_exc:
                 response = await cls.handle_error(request, request_context, exc=after_request_exc)
 
+        return response
+
+    @classmethod
+    async def execute_handler(
+        cls, request: Request, request_context: dict, handler_name: str,
+        *args, **kwargs
+    ) -> Response:
+        """
+        Finds a handler on this resource given its name and calls it.
+
+        :param request: current HTTP request
+        :param request_context: current request context
+        :param handler_name: name of the handler callable
+        """
+        resource = cls(request, request_context, *args, **kwargs)
+        handler = getattr(resource, handler_name, None)
+        response = await handler(*args, **kwargs)
         return response
 
     def process_sparse_fields_request(self, serialized_data: dict, many: bool = False) -> dict:
