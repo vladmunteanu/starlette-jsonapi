@@ -8,7 +8,7 @@ alabaster==0.7.12
     # via sphinx
 apispec==4.3.0
     # via -r requirements.in
-babel==2.8.0
+babel==2.9.1
     # via sphinx
 certifi==2020.6.20
     # via requests
