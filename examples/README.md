@@ -12,10 +12,10 @@ Example for sample-plain using pyenv:
 ```shell script
 # switch to example directory
 cd ./sample-plain
-# create the virtual environment using Python 3.6
-pyenv virtualenv -p python3.6 starlette-jsonapi-plain
+# create the virtual environment using Python 3.7
+pyenv virtualenv -p python3.7 sj-ex-plain
 # activate the virtual environment
-pyenv activate starlette-jsonapi-plain
+pyenv activate sj-ex-plain
 # install dependencies specific to each project
 pip install -r requirements.txt
 python start_service.py
