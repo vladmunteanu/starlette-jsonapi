@@ -80,7 +80,7 @@ class JSONAPISchemaConverter(OpenAPIConverter):
         schema_list = [field.parent for field in fields.values()]
         if schema_list:
             if not isinstance_or_subclass(schema_list[0], JSONAPISchema):
-                return super().fields2jsonschema(fields, ordered=ordered, partial=partial)
+                return super().fields2jsonschema(fields, partial=partial)
         default_fields = [
             ('id', None),
             ('type', {'type': 'string'}),

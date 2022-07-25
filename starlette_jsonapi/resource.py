@@ -136,7 +136,7 @@ class _BaseResourceHandler:
                 if request.method not in cls.allowed_methods:
                     raise JSONAPIException(status_code=405)
                 resource = cls(request, request_context, *args, **kwargs)
-                handler = getattr(resource, handler_name, None)
+                handler = getattr(resource, handler_name)
                 response = await handler(*args, **kwargs)
             except Exception as e:
                 response = await cls.handle_error(request, request_context, exc=e)
