@@ -1,6 +1,7 @@
 # starlette_jsonapi
 A minimal "framework" intended to help write [json:api](https://jsonapi.org) compliant services in async Python,
-written on top of [starlette](https://starlette.io) and [marshmallow-jsonapi](https://marshmallow-jsonapi.readthedocs.io/).
+written on top of [starlette](https://www.starlette.io) and 
+[marshmallow-jsonapi](https://marshmallow-jsonapi.readthedocs.io/).
 
 In the maintainer's view, REST frameworks that come with a complete data layer implementation are quite limiting
 and rarely usable in production systems due to business logic needs or authorization constraints.
