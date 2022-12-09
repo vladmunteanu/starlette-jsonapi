@@ -12,7 +12,7 @@ apispec==5.2.2
     # via -r requirements.in
 babel==2.10.3
     # via sphinx
-certifi==2022.6.15
+certifi==2022.12.7
     # via requests
 charset-normalizer==2.1.0
     # via requests
@@ -25,8 +25,6 @@ idna==3.3
     #   anyio
     #   requests
 imagesize==1.4.1
-    # via sphinx
-importlib-metadata==4.12.0
     # via sphinx
 jinja2==3.1.2
     # via sphinx
@@ -74,12 +72,5 @@ sphinxcontrib-serializinghtml==1.1.5
     # via sphinx
 starlette==0.20.4
     # via -r requirements.in
-typing-extensions==4.3.0
-    # via
-    #   anyio
-    #   importlib-metadata
-    #   starlette
 urllib3==1.26.11
     # via requests
-zipp==3.8.1
-    # via importlib-metadata
