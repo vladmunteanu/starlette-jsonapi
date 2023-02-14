@@ -6,7 +6,7 @@
 #
 aiosqlite==0.16.1
     # via tortoise-orm
-anyio==3.2.1
+anyio==3.6.2
     # via starlette
 apispec==4.7.0
     # via starlette-jsonapi
@@ -18,8 +18,6 @@ h11==0.12.0
     # via uvicorn
 idna==3.2
     # via anyio
-importlib-metadata==4.6.1
-    # via click
 iso8601==0.1.14
     # via tortoise-orm
 marshmallow==3.12.1
@@ -34,7 +32,7 @@ pytz==2021.1
     # via tortoise-orm
 sniffio==1.2.0
     # via anyio
-starlette==0.15.0
+starlette==0.25.0
     # via
     #   -r requirements.in
     #   starlette-jsonapi
@@ -43,13 +41,6 @@ starlette-jsonapi==2.2.0
 tortoise-orm==0.17.4
     # via -r requirements.in
 typing-extensions==3.10.0.0
-    # via
-    #   aiosqlite
-    #   anyio
-    #   asgiref
-    #   importlib-metadata
-    #   uvicorn
+    # via aiosqlite
 uvicorn==0.14.0
     # via -r requirements.in
-zipp==3.5.0
-    # via importlib-metadata
