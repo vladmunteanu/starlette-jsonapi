@@ -26,8 +26,6 @@ idna==3.3
     #   requests
 imagesize==1.4.1
     # via sphinx
-importlib-metadata==4.12.0
-    # via sphinx
 jinja2==3.1.2
     # via sphinx
 markupsafe==2.1.1
@@ -72,14 +70,7 @@ sphinxcontrib-qthelp==1.0.3
     # via sphinx
 sphinxcontrib-serializinghtml==1.1.5
     # via sphinx
-starlette==0.20.4
+starlette==0.25.0
     # via -r requirements.in
-typing-extensions==4.3.0
-    # via
-    #   anyio
-    #   importlib-metadata
-    #   starlette
 urllib3==1.26.11
     # via requests
-zipp==3.8.1
-    # via importlib-metadata
