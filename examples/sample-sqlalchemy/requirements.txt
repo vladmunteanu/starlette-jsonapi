@@ -4,7 +4,7 @@
 #
 #    pip-compile --output-file=requirements.txt requirements.in
 #
-anyio==3.2.1
+anyio==3.6.2
     # via starlette
 apispec==4.7.0
     # via starlette-jsonapi
@@ -18,10 +18,6 @@ h11==0.12.0
     # via uvicorn
 idna==3.2
     # via anyio
-importlib-metadata==4.6.1
-    # via
-    #   click
-    #   sqlalchemy
 marshmallow==3.12.1
     # via
     #   marshmallow-jsonapi
@@ -32,19 +28,11 @@ sniffio==1.2.0
     # via anyio
 sqlalchemy==1.4.20
     # via -r requirements.in
-starlette==0.15.0
+starlette==0.25.0
     # via
     #   -r requirements.in
     #   starlette-jsonapi
 starlette-jsonapi==2.2.0
     # via -r requirements.in
-typing-extensions==3.10.0.0
-    # via
-    #   anyio
-    #   asgiref
-    #   importlib-metadata
-    #   uvicorn
 uvicorn==0.14.0
     # via -r requirements.in
-zipp==3.5.0
-    # via importlib-metadata
