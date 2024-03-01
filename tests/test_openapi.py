@@ -15,9 +15,207 @@ from starlette_jsonapi.resource import BaseResource, BaseRelationshipResource
 from starlette_jsonapi.schema import JSONAPISchema
 from starlette_jsonapi.meta import registered_resources
 from starlette_jsonapi.openapi import (
-    JSONAPISchemaGenerator, JSONAPIMarshmallowPlugin,
+    JSONAPISchemaConverter, JSONAPISchemaGenerator, JSONAPIMarshmallowPlugin,
     with_openapi_info, response_for_relationship, request_for_relationship,
 )
+
+
+JSONAPI_SCHEMA_CONVERTER = JSONAPISchemaConverter(
+    openapi_version='3.0.0',
+    schema_name_resolver=None,
+    spec=APISpec(
+        title='Test API',
+        version='1.0',
+        openapi_version='3.0.0',
+        info={'description': 'Test OpenAPI resource'},
+        plugins=[JSONAPIMarshmallowPlugin()],
+    )
+)
+
+
+class FakeSchema(JSONAPISchema):
+    class Meta:
+        type_ = "fakes"
+        self_route = f"{type_}:get"
+        self_route_kwargs = {"id": "<id>"}
+        self_route_many = f"{type_}:get_many"
+
+    id = fields.UUID(
+        metadata={
+            'unique': True,
+            'description': 'identifier of the instance',
+        },
+        required=True,
+    )
+    name = fields.Str(
+        required=True,
+        metadata={
+            'description': 'name of the instance'
+        }
+    )
+    version = fields.Str(
+        metadata={
+            'description': 'version of the instance'
+        }
+    )
+    deleted = fields.Boolean(
+        required=True,
+        metadata={
+            'description': 'if the instance is deleted'
+        }
+    )
+
+    @classmethod
+    def get_fields_with_parent_assigned(cls):
+        fields_parent_assigned = FakeSchema.get_fields()
+
+        for item in fields_parent_assigned:
+            fields_parent_assigned[item].parent = FakeSchema
+
+        return fields_parent_assigned
+
+
+def test_fields2jsonschema_conversion_if_id_first_item_iterated():
+    error = None
+    fields_to_convert = FakeSchema.get_fields_with_parent_assigned()
+
+    try:
+        jsonschema = JSONAPI_SCHEMA_CONVERTER.fields2jsonschema(
+            fields={
+                'id': fields_to_convert['id'],
+                'name': fields_to_convert['name'],
+                'deleted': fields_to_convert['deleted'],
+            },
+        )
+    except Exception as e:
+        error = e
+
+    assert not error
+    assert jsonschema == {
+        'type': 'object',
+        'properties': {
+            'id': {
+                'type': 'string',
+                'format': 'uuid',
+                'description': 'identifier of the instance',
+            },
+            'type': {
+                'type': 'string',
+                'enum': ['fakes'],
+            },
+            'attributes': {
+                'type': 'object',
+                'properties': {
+                    'name': {
+                        'type': 'string',
+                        'description': 'name of the instance',
+                    },
+                    'deleted': {
+                        'type': 'boolean',
+                        'description': 'if the instance is deleted',
+                    }
+                },
+                'required': ['deleted', 'name'],
+            }
+        },
+        'required': ['type', 'attributes'],
+    }
+
+
+def test_fields2jsonschema_conversion_if_id_last_item_iterated():
+    error = None
+    fields_to_convert = FakeSchema.get_fields_with_parent_assigned()
+
+    try:
+        jsonschema = JSONAPI_SCHEMA_CONVERTER.fields2jsonschema(
+            fields={
+                'name': fields_to_convert['name'],
+                'deleted': fields_to_convert['deleted'],
+                'id': fields_to_convert['id'],
+            },
+        )
+    except Exception as e:
+        error = e
+
+    assert not error
+    assert jsonschema == {
+        'type': 'object',
+        'properties': {
+            'id': {
+                'type': 'string',
+                'format': 'uuid',
+                'description': 'identifier of the instance',
+            },
+            'type': {
+                'type': 'string',
+                'enum': ['fakes'],
+            },
+            'attributes': {
+                'type': 'object',
+                'properties': {
+                    'name': {
+                        'type': 'string',
+                        'description': 'name of the instance',
+                    },
+                    'deleted': {
+                        'type': 'boolean',
+                        'description': 'if the instance is deleted',
+                    }
+                },
+                'required': ['deleted', 'name'],
+            }
+        },
+        'required': ['type', 'attributes'],
+    }
+
+
+def test_fields2jsonschema_conversion_if_id_in_between_item_iterated():
+    error = None
+    fields_to_convert = FakeSchema.get_fields_with_parent_assigned()
+
+    try:
+        jsonschema = JSONAPI_SCHEMA_CONVERTER.fields2jsonschema(
+            fields={
+                'name': fields_to_convert['name'],
+                'version': fields_to_convert['version'],
+                'id': fields_to_convert['id'],
+                'deleted': fields_to_convert['deleted'],
+            },
+        )
+    except Exception as e:
+        error = e
+
+    assert not error
+    assert jsonschema == {
+        'type': 'object',
+        'properties': {
+            'id': {
+                'type': 'string',
+                'format': 'uuid',
+                'description': 'identifier of the instance',
+            },
+            'type': {
+                'type': 'string',
+                'enum': ['fakes'],
+            },
+            'attributes': {
+                'type': 'object',
+                'properties': {
+                    'name': {
+                        'type': 'string',
+                        'description': 'name of the instance',
+                    },
+                    'deleted': {
+                        'type': 'boolean',
+                        'description': 'if the instance is deleted',
+                    },
+                    'version': {'description': 'version of the instance', 'type': 'string'},
+                },
+                'required': ['deleted', 'name'],
+            }
+        },
+        'required': ['type', 'attributes'],
+    }
 
 
 @pytest.fixture
