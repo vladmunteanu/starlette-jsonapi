@@ -106,7 +106,7 @@ class JSONAPISchemaConverter(OpenAPIConverter):
                 properties['attributes']['properties'][observed_field_name] = prop
             # TODO: support meta fields
 
-            if field_obj.required:
+            if field_obj.required and field_name != 'id':
                 if not partial or (
                     is_collection(partial) and field_name not in partial
                 ):
